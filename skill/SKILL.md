@@ -83,6 +83,7 @@ description: Claude Code 채팅으로 진행하는 텍스트 RPG(헌터물/크�
 
 - 매 턴 `~/personal/rp/scene.py <슬러그>` 에 대본을 표준 입력(heredoc)으로 넘긴다. 이전 장면은 통째로 교체된다.
 - 줄 형식: `@이름 대사`(이름의 공백은 `_`), `! 시스템 메시지`, `# <굴림 id>`(roll.py 출력의 `#숫자`. 그 줄을 넘길 때 주사위가 재생된다), 그 외는 서술. 서술은 2~3문장씩 한 줄로 끊는다.
+- 전리품을 얻으면 `$ <등급> <이름> | <설명>` 줄로 획득 카드를 띄운다(등급은 E~S). 승급, 새 스킬 획득, 보스 처치 같은 큰 보상은 `^ <큰 제목> | <부제>` 줄로 전체 화면 연출을 띄운다. `^` 는 장면당 한 번까지만 쓴다. 둘 다 그 줄 앞에 무슨 일이 있었는지 서술을 먼저 둔다.
 - 판정이 있으면 roll.py 를 먼저 굴리고, 대본에는 "무엇을 굴리는지·난이도·걸린 것" 서술 줄 → `# id` → 결과 서술 순서로 넣는다.
 - 채팅에는 `▶` 로 시작하는 한 줄(지금 유저가 답해야 하는 상황 요약)만 쓴다. `(GM)` 게임 밖 대화는 평소대로 채팅에 쓴다.
 - 유저의 행동 입력은 계속 채팅으로 받는다.
@@ -92,11 +93,17 @@ description: Claude Code 채팅으로 진행하는 텍스트 RPG(헌터물/크�
 - 판정 전에 무엇을 굴리는지와 난이도, 걸린 것을 먼저 서술로 말하고, 같은 턴에 굴려서 결과까지 서술한다.
 - `rolls` 가 30개를 넘으면 오래된 것부터 지운다.
 
+### 전투와 카운트다운
+- 전투가 시작되면 state의 `enemies` 에 적을 넣고, 피해를 줄 때마다 `cur` 를 고친다. 쓰러뜨리면 `"down": true`, 전투가 끝나면 `enemies` 를 비운다. 적 HP도 10 전후의 작은 숫자로 잡고, 상위 등급일수록 크게 잡는다. `traits` 에는 유저 캐릭터가 관찰로 알아낸 것(약점, 패턴, 부상)만 적는다.
+- 시간 압박이 있는 장면은 `clocks` 에 칸 게이지를 둔다. 나쁜 일이 다가오는 시계는 `"bad": true`(예: "거미가 고치를 다 감기까지" 4칸), 유저가 채워 가는 진행도는 bad 없이 둔다. 유저가 시간을 쓰거나 판정에 실패하면 bad 시계를 한 칸 채우고, 다 차면 그 일이 실제로 일어난다. 끝난 시계는 지운다.
+- 둘 다 장면을 끝까지 넘긴 뒤 YOUR TURN 아래에 유저 캐릭터의 HP·스킬 상태와 함께 표시된다. 전투 장면에는 `enemies` 를 반드시 채우고, 급한 장면에는 시계를 적극적으로 쓴다.
+
 ### state JSON 형식
 `ui/state/cheongun-3jo.json` 이 기준 예시다. 새 캠페인은 그 구조를 따른다.
-- 최상위: `title`, `genre`, `time`, `place`, `pc`, `npcs`, `clues`, `story`, `rolls`, `scene`(scene.py 만 쓴다)
+- 최상위: `title`, `genre`, `time`, `place`, `pc`, `npcs`, `clues`, `story`, `rolls`, `scene`(scene.py 만 쓴다), `enemies`, `clocks`
 - `pc`: `name`, `blurb`, `grade`(헌터물만), `gauges`[{label, cur, max}] (HP, 이성, 횃불 등), `conditions`[문자열], `stats`{이름: 보정}, `skills`[{name, state: ready|used|settling|locked, desc, cost, note}], `inventory`[{name, desc, qty}], `money`[{label, amount, debt, note}]
 - `npcs`[]: `name`, `major`, `age`, `grade`, `role`, `attitude`, `tone`(good|warn|bad|info), `speech`, `status`(사망·연락 두절 등, 평소엔 생략), `events`[], `known`[]
+- `enemies`[]: {name, grade, cur, max, traits[], down}. HP를 숨기고 싶으면 cur·max를 뺀다. `clocks`[]: {label, cur, max, bad}.
 - `clues`[]: {text, done}. `story`[]: {title, text}. `rolls` 는 roll.py 만 쓴다.
 
 ### 기믹

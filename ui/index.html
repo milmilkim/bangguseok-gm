@@ -117,6 +117,40 @@ details .body ul { margin: 0; padding-left: 18px; }
 #dice .d20.spin { animation: shake .12s infinite; }
 #dice .calc { font: 16px var(--num); min-height: 24px; }
 #dice .verdict { font-size: 26px; font-weight: 800; letter-spacing: .2em; margin-top: 8px; min-height: 40px; }
+.clock { display: flex; align-items: center; gap: 10px; padding: 5px 0; font-size: 13px; }
+.clock .segs { display: flex; gap: 3px; margin-left: auto; }
+.clock .segs i { width: 16px; height: 10px; border: 1px solid var(--line); border-radius: 2px; background: #0a1220; transform: skewX(-18deg); }
+.clock .segs i.on { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 8px #5ad1ff88; }
+.clock.bad .segs i.on { background: var(--bad); border-color: var(--bad); box-shadow: 0 0 8px #ff5d6c88; }
+.clock.bad.full { color: var(--bad); }
+.enemy { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+.enemy .grade { width: 30px; height: 30px; font-size: 15px; margin: 0; grid-row: span 2; }
+.enemy .top { display: flex; gap: 8px; align-items: baseline; }
+.enemy .top span { margin-left: auto; font: 12px var(--num); color: var(--muted); }
+.enemy .bar { margin: 0; } .enemy .bar i { background: linear-gradient(90deg, #a8303c, var(--bad)); }
+.enemy .tags { grid-column: 2; margin-top: 2px; }
+.enemy.down { opacity: .45; } .enemy.down b { text-decoration: line-through; }
+.hud h5 { margin: 12px 0 2px; font-size: 10.5px; letter-spacing: .18em; color: var(--muted); font-weight: 600; }
+.hud .mine { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; }
+.ln.loot { display: flex; gap: 12px; align-items: center; border: 1px solid currentColor; border-radius: 6px; padding: 10px 12px;
+  background: linear-gradient(100deg, #0a1220 40%, color-mix(in srgb, currentColor 14%, #0a1220)); box-shadow: 0 0 18px color-mix(in srgb, currentColor 25%, transparent); }
+.ln.loot.now { animation: flip .5s ease-out; }
+.ln.loot .grade { margin: 0; width: 38px; height: 38px; font-size: 19px; }
+.ln.loot b { color: var(--text); font-size: 15px; } .ln.loot small { display: block; color: var(--muted); font-size: 12.5px; }
+.ln.loot .tag { margin-left: auto; font-size: 10px; letter-spacing: .25em; }
+.ln.bannerln { text-align: center; color: var(--gold); border-block: 1px solid #ffd16655; padding: 8px 0; font-weight: 700; letter-spacing: .12em; }
+.ln.bannerln small { display: block; color: var(--muted); font-weight: 400; letter-spacing: 0; }
+#banner { position: fixed; inset: 0; z-index: 11; display: grid; place-items: center; cursor: pointer; text-align: center;
+  background: radial-gradient(600px 300px at 50% 50%, #3a2c0a 0%, #03060cee 70%); }
+#banner[hidden] { display: none; }
+#banner .rule { height: 1px; width: min(70vw, 420px); margin: 14px auto; background: linear-gradient(90deg, transparent, var(--gold), transparent); animation: widen .6s ease-out; }
+#banner h2 { margin: 0; font-size: 34px; letter-spacing: .25em; color: var(--gold); text-shadow: 0 0 30px #ffd166aa; animation: pop .5s cubic-bezier(.2,1.6,.4,1); }
+#banner p { margin: 0; color: var(--text); font-size: 15px; animation: rise .5s .3s both; }
+#banner small { color: var(--muted); letter-spacing: .3em; font-size: 10.5px; }
+@keyframes flip { from { transform: rotateX(90deg); opacity: 0; } }
+@keyframes pop { from { transform: scale(.6); opacity: 0; } }
+@keyframes widen { from { width: 0; } }
+@media (prefers-reduced-motion: reduce) { .ln.loot.now, #banner h2, #banner p, #banner .rule { animation: none; } }
 .stage { cursor: pointer; min-height: 60vh; padding-bottom: 8px; user-select: none; }
 .ln { margin: 0 0 14px; opacity: .5; transition: opacity .3s; }
 .ln.now { opacity: 1; animation: rise .25s ease-out; }
@@ -151,6 +185,9 @@ details .body ul { margin: 0; padding-left: 18px; }
 <div id="dice" hidden><div class="box">
   <div class="name" id="dName"></div><div class="d20" id="dNum"></div>
   <div class="calc" id="dCalc"></div><div class="verdict" id="dVerdict"></div>
+</div></div>
+<div id="banner" hidden><div>
+  <small>SYSTEM</small><div class="rule"></div><h2 id="bTitle"></h2><div class="rule"></div><p id="bSub"></p>
 </div></div>
 <script>
 const slug = new URLSearchParams(location.search).get('c');
@@ -188,11 +225,32 @@ function fold(key, summaryKids, bodyKids, cls) {
   return d;
 }
 
+function hud(s, withMine) {
+  const clocks = s.clocks || [], enemies = s.enemies || [];
+  if (!clocks.length && !enemies.length && !withMine) return null;
+  return h('div', { class: 'hud' },
+    clocks.map(c => h('div', { class: 'clock' + (c.bad ? ' bad' : '') + (c.cur >= c.max ? ' full' : '') }, c.label,
+      h('div', { class: 'segs', title: `${c.cur} / ${c.max}` }, Array.from({ length: c.max }, (_, i) => h('i', { class: i < c.cur ? 'on' : '' }))))),
+    enemies.length ? h('h5', {}, 'ENEMY') : null,
+    enemies.map(e => h('div', { class: 'enemy' + (e.down ? ' down' : '') },
+      h('div', { class: 'grade g-' + (e.grade || 'E') }, e.grade || '?'),
+      h('div', { class: 'top' }, h('b', {}, e.name), e.down ? h('span', {}, '처치') : e.max ? h('span', {}, `${e.cur} / ${e.max}`) : null),
+      e.max && !e.down ? h('div', { class: 'bar' }, h('i', { style: `width:${100 * e.cur / e.max}%` })) : h('div', {}),
+      e.traits?.length ? h('div', { class: 'tags' }, e.traits.map(t => h('span', { class: 'chip' }, t))) : null)),
+    withMine ? [h('h5', {}, s.pc.name),
+      h('div', { class: 'mine' },
+        (s.pc.gauges || []).map(g => h('span', { class: 'chip ' + (g.cur / g.max <= 0.34 ? 'bad' : 'good') }, `${g.label} ${g.cur}/${g.max}`)),
+        s.pc.skills.filter(k => k.state !== 'locked').map(k => h('span', { class: 'chip ' + (SKILL_STATE[k.state] || [])[1] }, `「${k.name}」 ${(SKILL_STATE[k.state] || [k.state])[0]}`)),
+        (s.pc.conditions || []).map(c => h('span', { class: 'chip warn' }, c)))] : null);
+}
+
 const SKILL_STATE = { ready: ['사용 가능', 'good'], used: ['사용함', 'warn'], settling: ['정착 중', 'warn'], locked: ['잠김', ''] };
 
 function viewStatus(s) {
   const pc = s.pc;
+  const enc = hud(s);
   return [
+    enc && win('ENCOUNTER', enc),
     win('STATUS',
       h('div', { class: 'who' }, avatar(pc.name, true),
         h('div', {}, h('h3', {}, pc.name), h('p', {}, pc.blurb)),
@@ -250,6 +308,9 @@ function sceneLine(s, l, now) {
   if (l.t === 'say') return h('div', { class: cls + 'say' }, avatar(l.who, true),
     h('div', { class: 'bubble' }, h('span', { class: 'name' }, l.who), h('p', {}, l.text)));
   if (l.t === 'sys') return h('div', { class: cls + 'sys' }, l.text);
+  if (l.t === 'loot') return h('div', { class: cls + 'loot g-' + l.grade },
+    h('div', { class: 'grade' }, l.grade), h('div', {}, h('b', {}, l.name), l.text && h('small', {}, l.text)), h('span', { class: 'tag' }, 'GET'));
+  if (l.t === 'banner') return h('div', { class: cls + 'bannerln' }, l.text, l.sub && h('small', {}, l.sub));
   if (l.t === 'roll') { const r = s.rolls.find(r => r.id === l.roll); return r && h('div', { class: cls + 'rollln' }, rollRow(r)); }
   return h('p', { class: cls + 'narr' }, l.text);
 }
@@ -261,6 +322,7 @@ function advance(all) {
   const l = lines[shown - 1], r = !all && l.t === 'roll' && state.rolls.find(r => r.id === l.roll);
   render();
   if (r) playRoll(r);
+  if (!all && l.t === 'banner') playBanner(l);
   scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
 }
 
@@ -273,7 +335,7 @@ function viewScene(s) {
   const stage = h('section', { class: 'win stage' },
     sc.lines.slice(0, n).map((l, i) => sceneLine(s, l, i === n - 1)),
     done ? h('div', { class: 'turn' }, h('h4', {}, 'YOUR TURN'),
-        h('p', { class: 'muted' }, '채팅에 행동을 입력'))
+        hud(s, true), h('p', { class: 'muted' }, '채팅에 행동을 입력'))
       : h('div', { class: 'next more' }, `▼ 클릭 · Space  (${n}/${sc.lines.length})`, skip));
   stage.onclick = () => advance();
   return stage;
@@ -281,11 +343,7 @@ function viewScene(s) {
 
 function viewRolls(s) {
   if (!s.rolls.length) return win('판정 로그', h('p', { class: 'empty' }, '아직 굴린 판정이 없음'));
-  return win('판정 로그', s.rolls.slice().reverse().map(r => h('div', { class: 'roll' },
-    h('div', {}, r.name, h('div', { class: 'muted' }, r.at)),
-    h('div', { class: 'calc' }, h('span', { class: r.d20 === 20 ? 'crit' : r.d20 === 1 ? 'fumble' : '' }, r.d20),
-      ` ${signed(r.mod)} = `, h('b', {}, r.total), ` / ${r.dc}`),
-    h('span', { class: 'chip ' + (r.success ? 'good' : 'bad') }, verdict(r)))));
+  return win('판정 로그', s.rolls.slice().reverse().map(rollRow));
 }
 const verdict = r => r.d20 === 20 ? '대성공' : r.d20 === 1 ? '대실패' : r.success ? '성공' : '실패';
 
@@ -321,6 +379,11 @@ function playRoll(r) {
     diceTimer = setTimeout(() => $('dice').hidden = true, 3500);
   }, 1000);
 }
+function playBanner(l) {
+  $('bTitle').textContent = l.text; $('bSub').textContent = l.sub || '';
+  $('banner').hidden = false;
+}
+$('banner').onclick = () => $('banner').hidden = true;
 $('dice').onclick = () => { clearTimeout(diceTimer); $('dice').hidden = true; };
 
 async function poll() {
@@ -339,7 +402,7 @@ async function poll() {
     if (!state) $('view').replaceChildren(h('p', { class: 'empty' }, slug ? `state/${slug}.json 을 읽지 못함` : '주소에 ?c=<캠페인-슬러그> 를 붙여야 함'));
   }
 }
-addEventListener('keydown', e => { if ((e.key === ' ' || e.key === 'Enter') && !e.target.closest('button, summary')) { e.preventDefault(); $('dice').hidden ? advance() : $('dice').click(); } });
+addEventListener('keydown', e => { if ((e.key === ' ' || e.key === 'Enter') && !e.target.closest('button, summary')) { e.preventDefault(); !$('banner').hidden ? $('banner').click() : $('dice').hidden ? advance() : $('dice').click(); } });
 poll();
 setInterval(poll, 2000);
 </script>
