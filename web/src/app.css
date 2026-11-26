@@ -394,3 +394,19 @@
   font-size: 0.875rem;
   color: var(--color-text-secondary);
 }
+
+/* 로비의 설정 한 줄: 왼쪽에 이름과 설명, 오른쪽에 선택 */
+.rp-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-2) var(--spacing-4);
+  padding-block: var(--spacing-3);
+}
+.rp-row + .rp-row {
+  border-top: var(--border-width) solid var(--color-border);
+}
+.rp-row > :first-child {
+  flex: 1 1 220px;
+}
