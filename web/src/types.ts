@@ -79,7 +79,10 @@ export type Answer = {
   roll?: Roll;
 };
 
-export type Ending = {title: string; kind: 'true' | 'good' | 'normal' | 'bad'; text: string};
+export type Ending = {title: string; kind: 'true' | 'good' | 'normal' | 'bad'; text: string; total?: number};
+
+// 첫 값이 기본값. rp.py 의 OPTIONS 와 같아야 한다
+export const OPTIONS: Record<string, string[]> = {결말: ['엔딩 있음', '엔드리스'], 전투: ['사용', '미사용'], 주인공: ['내 입력만', 'GM이 연기']};
 
 type AskBase = {id: number; answer?: Answer};
 export type Ask = AskBase &
@@ -120,6 +123,7 @@ export type GameState = {
   clocks?: Clock[];
   map?: GameMap;
   ending?: Ending;
+  options?: Record<string, string>;
 };
 
 export type LogEntry = {id: number; time?: string; place?: string; lines: Line[]; said?: string};
@@ -134,4 +138,5 @@ export type Campaign = {
   grade: string;
   scene: number;
   ending?: Ending | null;
+  series?: string | null;
 };

@@ -29,7 +29,7 @@
   ?timed 10 | A | B                  제한 시간(초) 안에 고른다. 시간 초과도 결과
   ?code 라벨 | 자리수                암호·숫자 입력
   ?cards 라벨 | 3                    뒤집힌 카드 N장 중 한 장
-  ?ending 제목 | 종류 | 한 줄 요약   캠페인의 결말. 종류는 true / good / normal / bad
+  ?ending 제목 | 종류 | 한 줄 요약 | 갈래 수   캠페인의 결말. 종류는 true / good / normal / bad. 갈래 수는 생략 가능
 """
 import json
 import os
@@ -68,6 +68,7 @@ MAX_TEXT = 2000
 SKILL_SRC = ROOT / "skill" / "SKILL.md"
 SKILL_DST = Path.home() / ".claude" / "skills" / "rp" / "SKILL.md"
 ENDINGS = ("true", "good", "normal", "bad")
+OPTIONS = {"결말": ("엔딩 있음", "엔드리스"), "전투": ("사용", "미사용"), "주인공": ("내 입력만", "GM이 연기")}
 
 
 def state_path(slug):
@@ -153,10 +154,11 @@ def parse(text, stats):
                 label, *count = split(rest, 1)
                 ask = {"type": "cards", "label": label, "count": int(count[0]) if count else 3}
             elif kind == "ending":
-                title, tone, *summary = split(rest, 2)
+                title, tone, *more = split(rest, 2)
                 if tone not in ENDINGS:
                     raise ValueError(f"결말 종류는 {' / '.join(ENDINGS)} 중 하나: {tone!r}")
-                ask = {"type": "ending", "title": title, "kind": tone, "text": summary[0] if summary else "",
+                ask = {"type": "ending", "title": title, "kind": tone, "text": more[0] if more else "",
+                       "total": int(more[1]) if len(more) > 1 else 0,
                        "choices": ["후일담을 더 본다", "놓친 갈래를 묻는다", "2회차를 시작한다"]}
             else:
                 raise ValueError(f"모르는 입력 종류: ?{kind}")
@@ -265,7 +267,7 @@ def write_turn(slug, text):
     state["scene"] = {"id": seq, "lines": lines}
     state["ask"] = {"id": seq, **ask}
     if ask["type"] == "ending":
-        state["ending"] = {"title": ask["title"], "kind": ask["kind"], "text": ask["text"], "scene": seq}
+        state["ending"] = {k: ask[k] for k in ("title", "kind", "text", "total")} | {"scene": seq}
     state["rolls"] = state.get("rolls", [])[-MAX_ROLLS:]
     save_state(slug, state)
     save_state(slug, state, shown=True)
@@ -377,6 +379,18 @@ def answer(body, from_chat=False):
         inbox_push(slug, "[이어하기] 이 캠페인을 이어서 한다")
         return 200, {"ok": True}
 
+    if kind == "option":
+        key, value = body.get("key"), body.get("value")
+        if value not in OPTIONS.get(key, ()):
+            return 400, {"error": "없는 설정"}
+        # GM을 깨우지 않고 적어만 둔다. 바뀐 내용(notes)은 다음 입력에 붙어서 GM에게 간다.
+        for shown in (True, False):
+            st = load_state(slug, shown)
+            st.setdefault("options", {})[key] = value
+            st.setdefault("notes", {})[key] = value
+            save_state(slug, st, shown)
+        return 200, {"ok": True}
+
     ask = state.get("ask") or {}
     if body.get("ask") != ask.get("id") or ask.get("answer"):
         return 409, {"error": "이미 지나간 입력"}
@@ -424,14 +438,18 @@ def answer(body, from_chat=False):
         msg = f"[판정] {text}" + (f" · 사용한 강화: {', '.join(costs)}" if costs else "")
 
     ask["answer"] = said
+    notes = state.pop("notes", None)
+    if notes:
+        msg += " · [설정 변경] " + ", ".join(f"{k}: {v}" for k, v in notes.items())
     save_state(slug, state, shown=True)
     # 원본에도 같은 답을 남긴다 (GM이 그 사이 고친 다른 내용은 건드리지 않는다)
     source = load_state(slug)
+    source.pop("notes", None)
     if source.get("ask", {}).get("id") == ask["id"]:
         source["ask"]["answer"] = said
         if kind == "roll":
             source.setdefault("rolls", []).append(said["roll"])
-        save_state(slug, source)
+    save_state(slug, source)
     if from_chat:
         return 200, {"ok": True, "msg": msg}
     inbox_push(slug, msg)
@@ -449,7 +467,7 @@ def campaigns():
         out.append({"slug": path.stem, "title": s.get("title", path.stem), "genre": s.get("genre", ""),
                     "time": s.get("time", ""), "place": s.get("place", ""), "pc": pc.get("name", ""),
                     "grade": pc.get("grade", ""), "scene": s.get("scene", {}).get("id", 0),
-                    "ending": s.get("ending")})
+                    "ending": s.get("ending"), "series": s.get("series")})
     return out
 
 
@@ -750,7 +768,8 @@ def selfcheck():
     assert parse("가.\n> 문을 연다\n> 돌아간다", stats)[1] == {"type": "action", "choices": ["문을 연다", "돌아간다"]}
     assert parse("가.\n?timed 10 | 뛴다 | 숨는다", stats)[1]["seconds"] == 10
     end = parse("가.\n?ending 썰물이 빠진 뒤 | good | 섬은 남았다", stats)[1]
-    assert (end["type"], end["title"], end["kind"], end["text"]) == ("ending", "썰물이 빠진 뒤", "good", "섬은 남았다"), end
+    assert (end["type"], end["title"], end["kind"], end["text"], end["total"]) == ("ending", "썰물이 빠진 뒤", "good", "섬은 남았다", 0), end
+    assert parse("가.\n?ending 끝 | bad | 요약 | 4", stats)[1]["total"] == 4
     try:
         parse("가.\n?roll 쉬운 일 | 힘 | 6", stats)
         raise AssertionError("너무 쉬운 판정이 통과함")

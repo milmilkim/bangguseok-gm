@@ -302,6 +302,7 @@ function EndingCard({ending, state}: {ending: Ending; state: GameState}) {
       <small>{ENDING_LABEL[ending.kind]}</small>
       <h2>{ending.title}</h2>
       {ending.text && <p>{ending.text}</p>}
+      {!!ending.total && <p>이 이야기의 결말 {ending.total}갈래 중 하나</p>}
       <hr />
       <span>{state.pc.name} · {record.join(' · ')}</span>
     </div>
