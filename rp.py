@@ -10,6 +10,7 @@
         action "행동 문장" | roll [강화 번호…] | choice 2 | code 4471 | card 2
   rp.py roll <슬러그> <판정명> <능력치> <난이도>   입력 요청 없이 GM이 바로 굴려 기록. 능력치는 힘, 힘+2, +3 꼴
   rp.py dice [면수]      GM 비공개 굴림 (기본 20)
+  rp.py example [슬러그] 예제 캠페인을 내 세이브로 복사 (슬러그 없이 실행하면 목록)
 
 대본 줄 형식 (빈 줄 무시, 아래에 안 걸리면 서술 한 문단):
   @이름 대사                         이름의 공백은 _
@@ -46,6 +47,8 @@ DIST = WEB / "dist"
 STATE_DIR = ROOT / "ui" / "state"
 PORTRAIT_DIR = ROOT / "ui" / "portraits"
 LOG_DIR = ROOT / "ui" / "log"
+SAVE_DIR = ROOT / "saves"
+EXAMPLE_DIR = ROOT / "examples"
 RUN = ROOT / ".run"
 INBOX = RUN / "inbox.jsonl"
 WAITER = RUN / "waiter.json"
@@ -597,6 +600,24 @@ def main(argv):
             sys.exit(f"굴리지 못함: {e}")
         save_state(args[0], state)
         print(text)
+    elif cmd == "example":
+        if not args:
+            for d in sorted(EXAMPLE_DIR.iterdir()):
+                state = json.loads((d / "state.json").read_text(encoding="utf-8"))
+                print(f"{d.name}: {state['title']} ({state.get('genre', '')})")
+            return
+        state_path(args[0])
+        src = EXAMPLE_DIR / args[0]
+        targets = {"state.json": STATE_DIR / f"{args[0]}.json", "save.md": SAVE_DIR / f"{args[0]}.md", "log.jsonl": LOG_DIR / f"{args[0]}.jsonl"}
+        if not (src / "state.json").is_file():
+            sys.exit(f"없는 예제: {args[0]}")
+        if any(t.exists() for t in targets.values()):
+            sys.exit(f"이미 같은 이름의 세이브가 있어서 덮어쓰지 않음: {args[0]}")
+        for name, target in targets.items():
+            if (src / name).is_file():
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes((src / name).read_bytes())
+        print(f"예제 '{args[0]}' 를 가져옴. /rp 로 이어서 하면 된다")
     elif cmd == "dice":
         sides = int(args[0]) if args else 20
         print(f"🎲 d{sides} = {secrets.randbelow(sides) + 1}")

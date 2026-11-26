@@ -5,3 +5,7 @@ __pycache__/
 .run/
 web/node_modules/
 web/dist/
+
+# 내 캠페인 (세이브, 상태, 로그, 초상). 예제는 examples/ 에 있다
+saves/
+ui/

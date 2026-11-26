@@ -1,6 +1,6 @@
-# rp
+# 방구석 GM 🎲
 
-Claude Code를 게임 마스터로 삼아 웹 패널에서 하는 텍스트 RPG. 헌터물, 로판, 무협, 크툴루 호러, 던전 탐험 등 장르를 가리지 않는다.
+Claude Code가 게임 마스터가 되는 도트 감성 텍스트 RPG. 방에서 혼자 `/rp` 한 줄이면 GM이 세계를 짓고, 판을 굴리고, 보스 도트까지 찍어 준다. 헌터물, 로판, 무협, 크툴루 호러, 던전 탐험 등 장르를 가리지 않는다.
 
 이야기는 패널과 채팅 창 양쪽에 똑같이 나오고, 행동 입력과 주사위도 어느 쪽에서든 할 수 있다.
 
@@ -29,19 +29,17 @@ Claude Code를 게임 마스터로 삼아 웹 패널에서 하는 텍스트 RPG.
 Claude Code에 이 레포 주소를 주고 이렇게 말하면 된다.
 
 ```text
-https://github.com/milmilkim/rp 이 레포 README의 "에이전트용 설치 절차"대로 설치해 줘.
+https://github.com/milmilkim/bangguseok-gm 이 레포 README의 "에이전트용 설치 절차"대로 설치해 줘.
 ```
-
-비공개 레포라서 그 컴퓨터의 `gh` 나 git이 이 계정으로 로그인돼 있어야 한다.
 
 ### 에이전트용 설치 절차
 
-이 절을 읽는 AI 에이전트는 아래를 순서대로 실행한다. 스킬이 `~/personal/rp` 경로를 그대로 쓰므로 **반드시 그 위치에** 받는다.
+이 절을 읽는 AI 에이전트는 아래를 순서대로 실행한다. 스킬이 `~/personal/rp` 경로를 그대로 쓰므로 레포 이름과 상관없이 **반드시 그 위치에** 받는다.
 
 1. 필요한 것을 확인한다: `python3 --version` 이 3.9 이상, `node --version` 이 20 이상. 없으면 설치를 멈추고 유저에게 알린다.
 2. 레포를 받는다. 이미 있으면 `git -C ~/personal/rp pull` 만 한다.
    ```bash
-   git clone https://github.com/milmilkim/rp.git ~/personal/rp
+   git clone https://github.com/milmilkim/bangguseok-gm.git ~/personal/rp
    ```
 3. 스킬을 Claude Code의 스킬 폴더에 복사한다.
    ```bash
@@ -55,7 +53,7 @@ https://github.com/milmilkim/rp 이 레포 README의 "에이전트용 설치 절
    ```bash
    python3 ~/personal/rp/rp.py selfcheck
    ```
-6. 유저에게 "새 Claude Code 세션에서 `/rp` 를 입력하면 시작된다"고 알린다. 스킬은 세션을 시작할 때 읽히므로 설치한 세션에서는 바로 안 될 수 있다.
+6. 유저에게 "새 Claude Code 세션에서 `/rp` 를 입력하면 시작된다"고 알린다. 스킬은 세션을 시작할 때 읽히므로 설치한 세션에서는 바로 안 될 수 있다. 예제 캠페인을 가져올지도 물어본다(아래 "예제 캠페인").
 
 ## 플레이
 
@@ -72,11 +70,31 @@ https://github.com/milmilkim/rp 이 레포 README의 "에이전트용 설치 절
 - **저장**은 자동이다. "오늘은 여기까지"라고 하면 정리하고 끝낸다.
 - 화면 오른쪽 위 표시: `GM 입력 대기 중`(내 차례) / `GM 쓰는 중` / `GM 자리 비움`(채팅에 아무 말이나 보내면 깨어난다).
 
+## 예제 캠페인
+
+진행 중이던 캠페인 세 개가 예제로 들어 있다. 가져오면 로비의 "이어하기"에 나타나고, 그 시점에서 이어서 할 수 있다. 상태 파일이 어떻게 생겼는지 보는 용도로도 쓴다.
+
+| 슬러그 | 제목 | 장르 |
+|---|---|---|
+| `cheongun-3jo` | 청운 용역 3조 | 헌터물 |
+| `second-entrance` | 두 번째 입학식 | 로판 |
+| `mukdo-ebb` | 묵도의 썰물 | 크툴루 호러 |
+
+```bash
+python3 ~/personal/rp/rp.py example cheongun-3jo
+```
+
+`examples/<슬러그>/save.md` 는 GM 전용 설계라 반전이 전부 적혀 있다. 그 캠페인을 직접 해 볼 거면 열지 않는다.
+
 ## 구조
 
 - `skill/SKILL.md`: `/rp` 스킬 본문. GM 규칙, 문체, 진행 순서
 - `rp.py`: 패널 서버, 장면 전송, 입력 대기, 주사위. `python3 rp.py` 로 사용법 출력
 - `web/`: 패널 앱. Vite + React 19 + [Astryx](https://astryx.atmeta.com/) gothic 테마
+- `examples/`: 예제 캠페인
+
+내 캠페인은 아래 위치에 생기고 git에는 올라가지 않는다(`.gitignore`).
+
 - `ui/state/<슬러그>.json`: 캠페인의 공개 상태
 - `ui/log/<슬러그>.jsonl`: 지나간 장면과 그때 유저가 고른 것
 - `ui/portraits/<슬러그>/<이름>.png`: 있으면 도트 프로필 대신 쓰는 초상
