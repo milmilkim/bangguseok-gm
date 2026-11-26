@@ -146,3 +146,7 @@ npm --prefix web run build
 ```bash
 python3 rp.py selfcheck && python3 rp.py stop && python3 rp.py start
 ```
+
+## 라이선스
+
+[MIT](LICENSE)
