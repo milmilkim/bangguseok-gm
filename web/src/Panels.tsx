@@ -3,16 +3,20 @@ import {Button} from '@astryxdesign/core/Button';
 import {Card} from '@astryxdesign/core/Card';
 import {Collapsible} from '@astryxdesign/core/Collapsible';
 import {EmptyState} from '@astryxdesign/core/EmptyState';
+import {useState} from 'react';
 import {Grid} from '@astryxdesign/core/Grid';
 import {Heading} from '@astryxdesign/core/Heading';
 import {HStack} from '@astryxdesign/core/HStack';
 import {ProgressBar} from '@astryxdesign/core/ProgressBar';
+import {SegmentedControl, SegmentedControlItem} from '@astryxdesign/core/SegmentedControl';
 import {Text} from '@astryxdesign/core/Text';
 import {Token} from '@astryxdesign/core/Token';
 import {VStack} from '@astryxdesign/core/VStack';
+import {act} from './api';
 import {signed, verdict, type Draft} from './Ask';
 import {PixelAvatar} from './PixelAvatar';
 import {Face, GRADE, heroLook} from './Scene';
+import {OPTIONS} from './types';
 import type {GameState, Npc} from './types';
 
 const won = (n: number) => n.toLocaleString('ko-KR') + '원';
@@ -23,6 +27,32 @@ const SKILL: Record<string, [string, 'success' | 'warning' | 'neutral']> = {
   locked: ['잠김', 'neutral'],
 };
 const TONE = {good: 'success', warn: 'warning', bad: 'error', info: 'info'} as const;
+
+function Options({c, state}: {c: string; state: GameState}) {
+  // 서버 사본이 다시 읽히기 전까지 방금 고른 값을 보여 준다
+  const [picked, setPicked] = useState<Record<string, string>>({});
+  return (
+    <Block title="게임 설정">
+      {Object.entries(OPTIONS).map(([key, values]) => (
+        <HStack key={key} hAlign="between" vAlign="center" gap={3} wrap="wrap">
+          <Text>{key}</Text>
+          <SegmentedControl
+            label={key}
+            value={picked[key] ?? state.options?.[key] ?? values[0]}
+            onChange={value => {
+              setPicked({...picked, [key]: value});
+              void act({c, kind: 'option', key, value});
+            }}>
+            {values.map(v => (
+              <SegmentedControlItem key={v} value={v} label={v} />
+            ))}
+          </SegmentedControl>
+        </HStack>
+      ))}
+      <Text type="supporting" color="secondary">바꾸면 다음 장면부터 적용돼.</Text>
+    </Block>
+  );
+}
 
 function Block({title, children}: {title: string; children: React.ReactNode}) {
   return (
@@ -158,6 +188,8 @@ export function StatusTab({c, state, draft}: {c: string; state: GameState; draft
           ))}
         </Block>
       )}
+
+      <Options c={c} state={state} />
     </VStack>
   );
 }

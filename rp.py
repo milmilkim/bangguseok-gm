@@ -11,6 +11,7 @@
   rp.py roll <슬러그> <판정명> <능력치> <난이도>   입력 요청 없이 GM이 바로 굴려 기록. 능력치는 힘, 힘+2, +3 꼴
   rp.py dice [면수]      GM 비공개 굴림 (기본 20)
   rp.py example [슬러그] 예제 캠페인을 내 세이브로 복사 (슬러그 없이 실행하면 목록)
+  rp.py install          이 폴더 위치에 맞춘 스킬을 ~/.claude/skills/rp 에 설치
   rp.py update           레포의 새 버전을 받아 스킬·패널·서버에 반영 (패널 로비의 업데이트 버튼과 같다)
 
 대본 줄 형식 (빈 줄 무시, 아래에 안 걸리면 서술 한 문단):
@@ -28,7 +29,7 @@
   ?timed 10 | A | B                  제한 시간(초) 안에 고른다. 시간 초과도 결과
   ?code 라벨 | 자리수                암호·숫자 입력
   ?cards 라벨 | 3                    뒤집힌 카드 N장 중 한 장
-  ?ending 제목 | 종류 | 한 줄 요약   캠페인의 결말. 종류는 true / good / normal / bad
+  ?ending 제목 | 종류 | 한 줄 요약 | 갈래 수   캠페인의 결말. 종류는 true / good / normal / bad. 갈래 수는 생략 가능
 """
 import json
 import os
@@ -67,6 +68,7 @@ MAX_TEXT = 2000
 SKILL_SRC = ROOT / "skill" / "SKILL.md"
 SKILL_DST = Path.home() / ".claude" / "skills" / "rp" / "SKILL.md"
 ENDINGS = ("true", "good", "normal", "bad")
+OPTIONS = {"결말": ("엔딩 있음", "엔드리스"), "전투": ("사용", "미사용"), "주인공": ("내 입력만", "GM이 연기")}
 
 
 def state_path(slug):
@@ -152,10 +154,11 @@ def parse(text, stats):
                 label, *count = split(rest, 1)
                 ask = {"type": "cards", "label": label, "count": int(count[0]) if count else 3}
             elif kind == "ending":
-                title, tone, *summary = split(rest, 2)
+                title, tone, *more = split(rest, 2)
                 if tone not in ENDINGS:
                     raise ValueError(f"결말 종류는 {' / '.join(ENDINGS)} 중 하나: {tone!r}")
-                ask = {"type": "ending", "title": title, "kind": tone, "text": summary[0] if summary else "",
+                ask = {"type": "ending", "title": title, "kind": tone, "text": more[0] if more else "",
+                       "total": int(more[1]) if len(more) > 1 else 0,
                        "choices": ["후일담을 더 본다", "놓친 갈래를 묻는다", "2회차를 시작한다"]}
             else:
                 raise ValueError(f"모르는 입력 종류: ?{kind}")
@@ -264,7 +267,7 @@ def write_turn(slug, text):
     state["scene"] = {"id": seq, "lines": lines}
     state["ask"] = {"id": seq, **ask}
     if ask["type"] == "ending":
-        state["ending"] = {"title": ask["title"], "kind": ask["kind"], "text": ask["text"], "scene": seq}
+        state["ending"] = {k: ask[k] for k in ("title", "kind", "text", "total")} | {"scene": seq}
     state["rolls"] = state.get("rolls", [])[-MAX_ROLLS:]
     save_state(slug, state)
     save_state(slug, state, shown=True)
@@ -376,6 +379,18 @@ def answer(body, from_chat=False):
         inbox_push(slug, "[이어하기] 이 캠페인을 이어서 한다")
         return 200, {"ok": True}
 
+    if kind == "option":
+        key, value = body.get("key"), body.get("value")
+        if value not in OPTIONS.get(key, ()):
+            return 400, {"error": "없는 설정"}
+        # GM을 깨우지 않고 적어만 둔다. 바뀐 내용(notes)은 다음 입력에 붙어서 GM에게 간다.
+        for shown in (True, False):
+            st = load_state(slug, shown)
+            st.setdefault("options", {})[key] = value
+            st.setdefault("notes", {})[key] = value
+            save_state(slug, st, shown)
+        return 200, {"ok": True}
+
     ask = state.get("ask") or {}
     if body.get("ask") != ask.get("id") or ask.get("answer"):
         return 409, {"error": "이미 지나간 입력"}
@@ -423,14 +438,18 @@ def answer(body, from_chat=False):
         msg = f"[판정] {text}" + (f" · 사용한 강화: {', '.join(costs)}" if costs else "")
 
     ask["answer"] = said
+    notes = state.pop("notes", None)
+    if notes:
+        msg += " · [설정 변경] " + ", ".join(f"{k}: {v}" for k, v in notes.items())
     save_state(slug, state, shown=True)
     # 원본에도 같은 답을 남긴다 (GM이 그 사이 고친 다른 내용은 건드리지 않는다)
     source = load_state(slug)
+    source.pop("notes", None)
     if source.get("ask", {}).get("id") == ask["id"]:
         source["ask"]["answer"] = said
         if kind == "roll":
             source.setdefault("rolls", []).append(said["roll"])
-        save_state(slug, source)
+    save_state(slug, source)
     if from_chat:
         return 200, {"ok": True, "msg": msg}
     inbox_push(slug, msg)
@@ -448,11 +467,34 @@ def campaigns():
         out.append({"slug": path.stem, "title": s.get("title", path.stem), "genre": s.get("genre", ""),
                     "time": s.get("time", ""), "place": s.get("place", ""), "pc": pc.get("name", ""),
                     "grade": pc.get("grade", ""), "scene": s.get("scene", {}).get("id", 0),
-                    "ending": s.get("ending")})
+                    "ending": s.get("ending"), "series": s.get("series")})
     return out
 
 
-# ---------------------------------------------------------------- 업데이트
+# ---------------------------------------------------------------- 설치·업데이트
+
+def skill_text():
+    """설치할 스킬 본문. skill/SKILL.md 에 적힌 기본 경로를 이 레포가 실제로 있는 위치로 바꾼 것이다."""
+    home, root = str(Path.home()), str(ROOT)
+    where = "~" + root[len(home):] if root.startswith(home + os.sep) else root
+    # ponytail: 자리표시자 없이 기본 경로 문자열을 그대로 치환한다. 예전 버전의 업데이트가 이 파일을 그대로 복사해도 깨지지 않는다
+    return SKILL_SRC.read_text(encoding="utf-8").replace("~/personal/rp", where)
+
+
+def install(expected=None):
+    """스킬을 설치하고 한 일을 한 줄로 돌려준다(이미 같으면 None).
+    설치돼 있던 것이 expected(직전 버전이 깔았을 내용)와 다르면 유저가 고쳐 쓴 것이므로 .bak 으로 남긴다."""
+    new = skill_text()
+    old = SKILL_DST.read_text(encoding="utf-8") if SKILL_DST.is_file() else None
+    if old == new:
+        return None
+    kept = old is not None and old != expected
+    if kept:
+        SKILL_DST.with_suffix(".md.bak").write_text(old, encoding="utf-8")
+    SKILL_DST.parent.mkdir(parents=True, exist_ok=True)
+    SKILL_DST.write_text(new, encoding="utf-8")
+    return "스킬을 새로 설치함. 새 /rp 세션부터 적용된다" + (" (고쳐 쓰던 스킬은 SKILL.md.bak 으로 남김)" if kept else "")
+
 
 def git(*args, timeout=20):
     env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
@@ -480,8 +522,7 @@ def update():
     """새 버전을 받아 반영하고 (한 일 목록, 서버를 다시 띄워야 하는지) 를 돌려준다."""
     global _fetched_at
     before = git("rev-parse", "HEAD").stdout.strip()
-    same = lambda: SKILL_DST.is_file() and SKILL_DST.read_bytes() == SKILL_SRC.read_bytes()
-    edited = SKILL_DST.is_file() and not same()
+    installed_by_us = skill_text()
     pull = git("pull", "--ff-only", "--quiet", timeout=60)
     if pull.returncode:
         err = pull.stderr.strip().splitlines() or ["git pull 실패"]
@@ -490,14 +531,7 @@ def update():
         raise RuntimeError("새 버전을 받지 못함: " + next((l for l in err if l.startswith(("error:", "fatal:"))), err[-1]))
     _fetched_at = 0.0
     changed = git("diff", "--name-only", before, "HEAD").stdout.splitlines()
-    done = []
-    if not same():
-        if edited:
-            # 설치된 스킬을 직접 고쳐 쓰던 경우 덮어쓰기 전에 남겨 둔다
-            SKILL_DST.with_suffix(".md.bak").write_bytes(SKILL_DST.read_bytes())
-        SKILL_DST.parent.mkdir(parents=True, exist_ok=True)
-        SKILL_DST.write_bytes(SKILL_SRC.read_bytes())
-        done.append("스킬을 새로 설치함. 새 /rp 세션부터 적용된다" + (" (고쳐 쓰던 스킬은 SKILL.md.bak 으로 남김)" if edited else ""))
+    done = [msg for msg in [install(installed_by_us)] if msg]
     if any(f.startswith("web/") for f in changed) or not (DIST / "index.html").is_file():
         build = subprocess.run("npm install && npm run build", shell=True, cwd=WEB, capture_output=True, text=True)
         if build.returncode:
@@ -706,6 +740,8 @@ def main(argv):
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes((src / name).read_bytes())
         print(f"예제 '{args[0]}' 를 가져옴. /rp 로 이어서 하면 된다")
+    elif cmd == "install":
+        print(install() or "스킬이 이미 최신")
     elif cmd == "update":
         try:
             done, restart = update()
@@ -732,7 +768,8 @@ def selfcheck():
     assert parse("가.\n> 문을 연다\n> 돌아간다", stats)[1] == {"type": "action", "choices": ["문을 연다", "돌아간다"]}
     assert parse("가.\n?timed 10 | 뛴다 | 숨는다", stats)[1]["seconds"] == 10
     end = parse("가.\n?ending 썰물이 빠진 뒤 | good | 섬은 남았다", stats)[1]
-    assert (end["type"], end["title"], end["kind"], end["text"]) == ("ending", "썰물이 빠진 뒤", "good", "섬은 남았다"), end
+    assert (end["type"], end["title"], end["kind"], end["text"], end["total"]) == ("ending", "썰물이 빠진 뒤", "good", "섬은 남았다", 0), end
+    assert parse("가.\n?ending 끝 | bad | 요약 | 4", stats)[1]["total"] == 4
     try:
         parse("가.\n?roll 쉬운 일 | 힘 | 6", stats)
         raise AssertionError("너무 쉬운 판정이 통과함")
