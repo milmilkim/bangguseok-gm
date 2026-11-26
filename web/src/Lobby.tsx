@@ -1,4 +1,5 @@
 import {useEffect, useRef, useState} from 'react';
+import {Badge} from '@astryxdesign/core/Badge';
 import {Banner} from '@astryxdesign/core/Banner';
 import {Button} from '@astryxdesign/core/Button';
 import {Card} from '@astryxdesign/core/Card';
@@ -13,8 +14,9 @@ import {Text} from '@astryxdesign/core/Text';
 import {TextArea} from '@astryxdesign/core/TextArea';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {VStack} from '@astryxdesign/core/VStack';
-import {act, useCampaigns, useGmStatus} from './api';
-import {signed} from './Ask';
+import {act, applyUpdate, fetchUpdate, useCampaigns, useGmStatus} from './api';
+import type {UpdateInfo} from './api';
+import {ENDING_LABEL, signed} from './Ask';
 import {PixelAvatar} from './PixelAvatar';
 import {HAIR, OUTFIT, SKIN} from './sprites';
 
@@ -70,6 +72,46 @@ function Pick({label, hint, options, value, onChange}: {label: string; hint?: st
         ))}
       </SegmentedControl>
     </VStack>
+  );
+}
+
+function Update() {
+  const [info, setInfo] = useState<UpdateInfo | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{done?: string[]; error?: string} | null>(null);
+  const check = (fresh: boolean) => void fetchUpdate(fresh).then(setInfo, () => {});
+  useEffect(() => check(false), []);
+  const run = async () => {
+    setBusy(true);
+    try {
+      const res = await applyUpdate();
+      setResult(res);
+      // 서버가 새 코드로 다시 뜰 시간을 준 뒤 새 패널을 불러온다
+      if (!res.error) setTimeout(() => location.reload(), 2500);
+    } catch {
+      setResult({error: '서버가 응답하지 않아. 잠시 뒤에 새로 고쳐 봐.'});
+    }
+    setBusy(false);
+  };
+
+  if (result?.error) return <Banner status="error" title="업데이트하지 못했어" description={result.error} collapsible={false} />;
+  if (result) return <Banner status="success" title="업데이트 완료" description={`${result.done?.join(' · ')}. 곧 화면을 새로 불러와.`} collapsible={false} />;
+  if (!info) return null;
+  if (!info.behind) {
+    return (
+      <HStack hAlign="end">
+        <Button size="sm" variant="ghost" label="업데이트 확인" onClick={() => check(true)} />
+      </HStack>
+    );
+  }
+  return (
+    <Banner
+      status="info"
+      title={`새 버전이 있어 (변경 ${info.behind}개)`}
+      description={info.notes.join(' / ')}
+      collapsible={false}
+      endContent={<Button variant="primary" size="sm" label={busy ? '받는 중…' : '업데이트'} isDisabled={busy} onClick={() => void run()} />}
+    />
   );
 }
 
@@ -137,9 +179,11 @@ export function Lobby() {
   return (
     <VStack gap={8}>
       <VStack gap={1}>
-        <Heading level={1} type="display-3">RP</Heading>
+        <Heading level={1} type="display-3">방구석 GM</Heading>
         <Text color="secondary">이야기는 이 화면에서 읽고, 행동도 여기서 입력해. GM은 채팅 창 뒤에서 판을 굴려.</Text>
       </VStack>
+
+      <Update />
 
       {away && (
         <Banner
@@ -169,6 +213,7 @@ export function Lobby() {
                     {c.grade ? ` (${c.grade}급)` : ''}
                   </Text>
                   <Text type="supporting" color="secondary">{[c.time, c.place].filter(Boolean).join(' · ')}</Text>
+                  {c.ending && <Badge variant="success" label={`${ENDING_LABEL[c.ending.kind]} · ${c.ending.title}`} />}
                 </VStack>
               </ClickableCard>
             ))}

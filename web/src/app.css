@@ -1,6 +1,7 @@
 /* 게임 전용 화면 요소. 색·간격·모서리는 전부 Astryx 테마 토큰에서 가져온다. */
 
 .rp-page {
+  --rp-tabs-height: 36px;
   max-width: 760px;
   margin: 0 auto;
   padding: var(--spacing-6) var(--spacing-4) var(--spacing-12);
@@ -116,7 +117,7 @@
 }
 .rp-stagewrap {
   position: sticky;
-  top: 0;
+  top: var(--rp-tabs-height);
   z-index: 2;
   background: var(--color-background-body);
   padding-block-end: var(--spacing-2);
@@ -344,4 +345,52 @@
   border: var(--border-width) solid var(--color-border-emphasized);
   border-radius: var(--radius-container) var(--radius-container) var(--radius-inner) var(--radius-container);
   background: var(--color-background-card);
+}
+
+/* 긴 화면(지난 장면)을 맨 아래까지 내려도 탭으로 바로 돌아갈 수 있게 붙여 둔다 */
+.rp-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--color-background-body);
+}
+
+.rp-ending {
+  text-align: center;
+  padding: var(--spacing-6) var(--spacing-4);
+  border: var(--border-width) solid var(--color-border-emphasized);
+  border-radius: var(--radius-container);
+  color: var(--color-text-primary);
+}
+.rp-ending small {
+  letter-spacing: 0.3em;
+  color: var(--color-text-warning);
+}
+.rp-ending.true small {
+  color: var(--color-text-success);
+}
+.rp-ending.bad small {
+  color: var(--color-text-error);
+}
+.rp-ending.normal small {
+  color: var(--color-text-secondary);
+}
+.rp-ending h2 {
+  margin: var(--spacing-2) 0;
+  font-size: 1.75rem;
+}
+.rp-ending p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  word-break: keep-all;
+}
+.rp-ending hr {
+  width: 40%;
+  margin: var(--spacing-4) auto;
+  border: 0;
+  border-top: var(--border-width) solid var(--color-border-emphasized);
+}
+.rp-ending span {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
 }

@@ -68,14 +68,16 @@ export function Game({c}: {c: string}) {
           <Link href="/">로비</Link>
         </HStack>
       </HStack>
-      <TabList value={shownTab} onChange={setTab} hasDivider>
-        <Tab value="scene" label="장면" />
-        <Tab value="status" label="상태" />
-        <Tab value="people" label="인물" />
-        {view.map && <Tab value="map" label="지도" />}
-        <Tab value="journal" label="기록" />
-        <Tab value="log" label="지난 장면" />
-      </TabList>
+      <div className="rp-tabs">
+        <TabList value={shownTab} onChange={setTab} hasDivider>
+          <Tab value="scene" label="장면" />
+          <Tab value="status" label="상태" />
+          <Tab value="people" label="인물" />
+          {view.map && <Tab value="map" label="지도" />}
+          <Tab value="journal" label="기록" />
+          <Tab value="log" label="지난 장면" />
+        </TabList>
+      </div>
       {/* 탭을 옮겨도 읽던 위치와 전투 연출이 유지되도록 장면은 숨기기만 한다 */}
       <div hidden={shownTab !== 'scene'}>
         <SceneView key={sceneId} c={c} state={view} base={held.current.base} draft={draft} stuck={!!gm && gm.pending && !gm.listening} />

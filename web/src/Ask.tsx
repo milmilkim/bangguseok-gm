@@ -12,7 +12,7 @@ import {TextInput} from '@astryxdesign/core/TextInput';
 import {Token} from '@astryxdesign/core/Token';
 import {VStack} from '@astryxdesign/core/VStack';
 import {act} from './api';
-import type {Answer, Ask, Roll} from './types';
+import type {Answer, Ask, Ending, GameState, Roll} from './types';
 
 export const signed = (n: number) => (n < 0 ? '−' : '+') + Math.abs(n);
 export const verdict = (r: Roll) => (r.d20 === 20 ? '대성공' : r.d20 === 1 ? '대실패' : r.success ? '성공' : '실패');
@@ -164,7 +164,7 @@ function RollAsk({ask, send, stuck}: {ask: Extract<Ask, {type: 'roll'}>; send: S
   );
 }
 
-function ActionAsk({ask, send, draft}: {ask: Extract<Ask, {type: 'action'}>; send: Send; draft: Draft}) {
+function ActionAsk({ask, send, draft}: {ask: Extract<Ask, {type: 'action' | 'ending'}>; send: Send; draft: Draft}) {
   const submit = () => {
     if (draft.text.trim()) void send({kind: 'action', text: draft.text, uses: draft.uses});
   };
@@ -190,7 +190,7 @@ function ActionAsk({ask, send, draft}: {ask: Extract<Ask, {type: 'action'}>; sen
         isLabelHidden
         rows={2}
         maxLength={2000}
-        placeholder="무엇을 할까? (Enter로 보내기, Shift+Enter로 줄바꿈)"
+        placeholder={ask.type === 'ending' ? '이야기는 끝났어. GM에게 하고 싶은 말이 있으면 적어 줘' : '무엇을 할까? (Enter로 보내기, Shift+Enter로 줄바꿈)'}
         value={draft.text}
         onChange={draft.setText}
         onKeyDown={e => {
@@ -202,7 +202,7 @@ function ActionAsk({ask, send, draft}: {ask: Extract<Ask, {type: 'action'}>; sen
         }}
       />
       <HStack hAlign="end">
-        <Button variant="primary" label="행동하기" isDisabled={!draft.text.trim()} onClick={submit} />
+        <Button variant="primary" label={ask.type === 'ending' ? '보내기' : '행동하기'} isDisabled={!draft.text.trim()} onClick={submit} />
       </HStack>
     </VStack>
   );
@@ -287,6 +287,27 @@ function CardsAsk({ask, send}: {ask: Extract<Ask, {type: 'cards'}>; send: Send})
   );
 }
 
+export const ENDING_LABEL: Record<Ending['kind'], string> = {true: '진 엔딩', good: '굿 엔딩', normal: '노멀 엔딩', bad: '배드 엔딩'};
+
+function EndingCard({ending, state}: {ending: Ending; state: GameState}) {
+  const bonds = state.npcs.filter(n => n.bond).sort((a, b) => b.bond!.cur - a.bond!.cur).slice(0, 3);
+  const record = [
+    `장면 ${state.scene?.id ?? 0}`,
+    `판정 ${state.rolls.at(-1)?.id ?? 0}회`,
+    state.pc.grade && `${state.pc.grade}급`,
+    ...bonds.map(n => `${n.name} 유대 ${n.bond!.cur}/${n.bond!.max}`),
+  ].filter(Boolean);
+  return (
+    <div className={`rp-ending ${ending.kind}`}>
+      <small>{ENDING_LABEL[ending.kind]}</small>
+      <h2>{ending.title}</h2>
+      {ending.text && <p>{ending.text}</p>}
+      <hr />
+      <span>{state.pc.name} · {record.join(' · ')}</span>
+    </div>
+  );
+}
+
 function sentText(ask: Ask, a: Answer): React.ReactNode {
   if (a.kind === 'action') return a.text;
   if (a.kind === 'timeout') return '시간 초과';
@@ -296,7 +317,7 @@ function sentText(ask: Ask, a: Answer): React.ReactNode {
   return null;
 }
 
-export function AskDock({c, ask, draft, stuck}: {c: string; ask: Ask; draft: Draft; stuck: boolean}) {
+export function AskDock({c, ask, draft, stuck, state}: {c: string; ask: Ask; draft: Draft; stuck: boolean; state: GameState}) {
   const [local, setLocal] = useState<Answer | null>(null);
   const [error, setError] = useState('');
   const send: Send = async body => {
@@ -316,6 +337,7 @@ export function AskDock({c, ask, draft, stuck}: {c: string; ask: Ask; draft: Dra
   if (answer) {
     return (
       <Waiting stuck={stuck}>
+        {ask.type === 'ending' && <EndingCard ending={ask} state={state} />}
         <HStack gap={2} vAlign="center" wrap="wrap">
           <Badge variant="info" label="보냄" />
           <Text>{sentText(ask, answer)}</Text>
@@ -328,7 +350,8 @@ export function AskDock({c, ask, draft, stuck}: {c: string; ask: Ask; draft: Dra
   return (
     <VStack gap={2}>
       {error && <Banner status="error" title={error} collapsible={false} isDismissable onDismiss={() => setError('')} />}
-      {ask.type === 'action' && <ActionAsk ask={ask} send={send} draft={draft} />}
+      {ask.type === 'ending' && <EndingCard ending={ask} state={state} />}
+      {(ask.type === 'action' || ask.type === 'ending') && <ActionAsk ask={ask} send={send} draft={draft} />}
       {(ask.type === 'choice' || ask.type === 'timed') && <ChoiceAsk ask={ask} send={send} />}
       {ask.type === 'code' && <CodeAsk ask={ask} send={send} />}
       {ask.type === 'cards' && <CardsAsk ask={ask} send={send} />}

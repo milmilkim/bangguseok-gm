@@ -79,6 +79,8 @@ export type Answer = {
   roll?: Roll;
 };
 
+export type Ending = {title: string; kind: 'true' | 'good' | 'normal' | 'bad'; text: string};
+
 type AskBase = {id: number; answer?: Answer};
 export type Ask = AskBase &
   (
@@ -97,6 +99,7 @@ export type Ask = AskBase &
     | {type: 'timed'; seconds: number; choices: string[]}
     | {type: 'code'; label: string; length: number}
     | {type: 'cards'; label: string; count: number}
+    | ({type: 'ending'; choices: string[]} & Ending)
   );
 
 export type GameMap = {rows: string[]; legend?: Record<string, string>; note?: string};
@@ -116,6 +119,7 @@ export type GameState = {
   enemies?: Enemy[];
   clocks?: Clock[];
   map?: GameMap;
+  ending?: Ending;
 };
 
 export type LogEntry = {id: number; time?: string; place?: string; lines: Line[]; said?: string};
@@ -129,4 +133,5 @@ export type Campaign = {
   pc: string;
   grade: string;
   scene: number;
+  ending?: Ending | null;
 };

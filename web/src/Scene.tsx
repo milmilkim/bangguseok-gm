@@ -319,7 +319,7 @@ export function SceneView({
             )}
             {(clocks.length > 0 || fighting) && <Divider />}
             {state.ask ? (
-              <AskDock key={state.ask.id} c={c} ask={state.ask} draft={draft} stuck={stuck} />
+              <AskDock key={state.ask.id} c={c} ask={state.ask} draft={draft} stuck={stuck} state={state} />
             ) : (
               <Text color="secondary">GM의 다음 장면을 기다리는 중</Text>
             )}
