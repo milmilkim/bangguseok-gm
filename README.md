@@ -35,24 +35,24 @@ https://github.com/milmilkim/bangguseok-gm 이 레포 README의 "에이전트용
 
 ### 에이전트용 설치 절차
 
-이 절을 읽는 AI 에이전트는 아래를 순서대로 실행한다. 스킬이 `~/personal/rp` 경로를 그대로 쓰므로 레포 이름과 상관없이 **반드시 그 위치에** 받는다.
+이 절을 읽는 AI 에이전트는 아래를 순서대로 실행한다. 받는 위치는 어디든 되지만 경로에 공백이 없어야 한다. 유저가 위치를 말하지 않았으면 `~/bangguseok-gm` 에 받는다. 아래 명령의 경로는 실제로 받은 위치로 바꾼다.
 
 1. 필요한 것을 확인한다: `python3 --version` 이 3.9 이상, `node --version` 이 20 이상. 없으면 설치를 멈추고 유저에게 알린다.
-2. 레포를 받는다. 이미 있으면 `git -C ~/personal/rp pull` 만 한다.
+2. 레포를 받는다. 이미 받아 둔 폴더가 있으면 새로 받지 말고 그 폴더에서 `python3 rp.py update` 만 한다.
    ```bash
-   git clone https://github.com/milmilkim/bangguseok-gm.git ~/personal/rp
+   git clone https://github.com/milmilkim/bangguseok-gm.git ~/bangguseok-gm
    ```
-3. 스킬을 Claude Code의 스킬 폴더에 복사한다.
+3. 스킬을 설치한다. 받은 위치가 스킬 본문에 들어가므로 파일을 직접 복사하지 말고 이 명령을 쓴다. 폴더를 옮겼을 때도 다시 실행하면 된다.
    ```bash
-   mkdir -p ~/.claude/skills/rp && cp ~/personal/rp/skill/SKILL.md ~/.claude/skills/rp/SKILL.md
+   python3 ~/bangguseok-gm/rp.py install
    ```
 4. 패널을 빌드하고 서버를 띄운다. 처음에는 `npm install` 과 빌드가 돌아서 1분쯤 걸린다.
    ```bash
-   python3 ~/personal/rp/rp.py start
+   python3 ~/bangguseok-gm/rp.py start
    ```
 5. 확인한다. `패널: http://localhost:4173/` 이 출력되고 아래 명령이 `selfcheck ok` 를 내면 끝이다.
    ```bash
-   python3 ~/personal/rp/rp.py selfcheck
+   python3 ~/bangguseok-gm/rp.py selfcheck
    ```
 6. 유저에게 "새 Claude Code 세션에서 `/rp` 를 입력하면 시작된다"고 알린다. 스킬은 세션을 시작할 때 읽히므로 설치한 세션에서는 바로 안 될 수 있다. 예제 캠페인을 가져올지도 물어본다(아래 "예제 캠페인").
 
@@ -78,7 +78,7 @@ https://github.com/milmilkim/bangguseok-gm 이 레포 README의 "에이전트용
 - 스킬(GM 규칙)은 **새 `/rp` 세션부터** 적용된다. 하던 세션은 예전 규칙으로 계속된다.
 - 설치된 스킬을 직접 고쳐 쓰고 있었다면 덮어쓰기 전에 `~/.claude/skills/rp/SKILL.md.bak` 으로 남긴다.
 - 레포 폴더에 커밋하지 않은 수정이 있어서 받을 수 없으면 그 이유를 화면에 보여 주고 아무것도 바꾸지 않는다.
-- 터미널에서는 `python3 ~/personal/rp/rp.py update` 가 같은 일을 한다.
+- 터미널에서는 레포 폴더에서 `python3 rp.py update` 가 같은 일을 한다.
 
 ## 예제 캠페인
 
@@ -90,8 +90,10 @@ https://github.com/milmilkim/bangguseok-gm 이 레포 README의 "에이전트용
 | `second-entrance` | 두 번째 입학식 | 로판 |
 | `mukdo-ebb` | 묵도의 썰물 | 크툴루 호러 |
 
+레포 폴더에서 실행한다.
+
 ```bash
-python3 ~/personal/rp/rp.py example cheongun-3jo
+python3 rp.py example cheongun-3jo
 ```
 
 `examples/<슬러그>/save.md` 는 GM 전용 설계라 반전이 전부 적혀 있다. 그 캠페인을 직접 해 볼 거면 열지 않는다.
@@ -122,24 +124,25 @@ python3 ~/personal/rp/rp.py example cheongun-3jo
 
 - 한 번에 한 세션만 플레이할 수 있다. 입력 대기가 서버 하나에 하나뿐이라 두 세션이 동시에 돌리면 서로의 대기를 밀어낸다.
 - 패널을 Claude 앱 안에서 자동으로 여는 건 데스크톱 앱의 브라우저 창 기능을 쓴다. 터미널 CLI에서는 주소가 출력되니 브라우저로 직접 연다.
-- 설치 경로가 `~/personal/rp` 로 고정이다.
 
 ## 고치기
 
-스킬을 고치면 `skill/SKILL.md` 에도 복사해서 커밋한다(두 곳에 있다).
+명령은 전부 레포 폴더에서 실행한다.
+
+스킬은 `skill/SKILL.md` 를 고친 뒤 다시 설치한다. 본문에 적힌 `~/personal/rp` 는 기본 경로이고, 설치할 때 레포가 실제로 있는 위치로 바뀐다.
 
 ```bash
-cp ~/.claude/skills/rp/SKILL.md ~/personal/rp/skill/SKILL.md
+python3 rp.py install
 ```
 
 패널을 고치면 다시 빌드하고 패널을 새로 고친다. Astryx 컴포넌트 사용법은 `web/AGENTS.md` 와 `npx astryx component <이름>` 참고.
 
 ```bash
-cd ~/personal/rp/web && npm run build
+npm --prefix web run build
 ```
 
 `rp.py` 를 고치면 자체 점검을 돌리고 서버를 다시 띄운다.
 
 ```bash
-cd ~/personal/rp && python3 rp.py selfcheck && python3 rp.py stop && python3 rp.py start
+python3 rp.py selfcheck && python3 rp.py stop && python3 rp.py start
 ```

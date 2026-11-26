@@ -11,6 +11,7 @@
   rp.py roll <슬러그> <판정명> <능력치> <난이도>   입력 요청 없이 GM이 바로 굴려 기록. 능력치는 힘, 힘+2, +3 꼴
   rp.py dice [면수]      GM 비공개 굴림 (기본 20)
   rp.py example [슬러그] 예제 캠페인을 내 세이브로 복사 (슬러그 없이 실행하면 목록)
+  rp.py install          이 폴더 위치에 맞춘 스킬을 ~/.claude/skills/rp 에 설치
   rp.py update           레포의 새 버전을 받아 스킬·패널·서버에 반영 (패널 로비의 업데이트 버튼과 같다)
 
 대본 줄 형식 (빈 줄 무시, 아래에 안 걸리면 서술 한 문단):
@@ -452,7 +453,30 @@ def campaigns():
     return out
 
 
-# ---------------------------------------------------------------- 업데이트
+# ---------------------------------------------------------------- 설치·업데이트
+
+def skill_text():
+    """설치할 스킬 본문. skill/SKILL.md 에 적힌 기본 경로를 이 레포가 실제로 있는 위치로 바꾼 것이다."""
+    home, root = str(Path.home()), str(ROOT)
+    where = "~" + root[len(home):] if root.startswith(home + os.sep) else root
+    # ponytail: 자리표시자 없이 기본 경로 문자열을 그대로 치환한다. 예전 버전의 업데이트가 이 파일을 그대로 복사해도 깨지지 않는다
+    return SKILL_SRC.read_text(encoding="utf-8").replace("~/personal/rp", where)
+
+
+def install(expected=None):
+    """스킬을 설치하고 한 일을 한 줄로 돌려준다(이미 같으면 None).
+    설치돼 있던 것이 expected(직전 버전이 깔았을 내용)와 다르면 유저가 고쳐 쓴 것이므로 .bak 으로 남긴다."""
+    new = skill_text()
+    old = SKILL_DST.read_text(encoding="utf-8") if SKILL_DST.is_file() else None
+    if old == new:
+        return None
+    kept = old is not None and old != expected
+    if kept:
+        SKILL_DST.with_suffix(".md.bak").write_text(old, encoding="utf-8")
+    SKILL_DST.parent.mkdir(parents=True, exist_ok=True)
+    SKILL_DST.write_text(new, encoding="utf-8")
+    return "스킬을 새로 설치함. 새 /rp 세션부터 적용된다" + (" (고쳐 쓰던 스킬은 SKILL.md.bak 으로 남김)" if kept else "")
+
 
 def git(*args, timeout=20):
     env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
@@ -480,8 +504,7 @@ def update():
     """새 버전을 받아 반영하고 (한 일 목록, 서버를 다시 띄워야 하는지) 를 돌려준다."""
     global _fetched_at
     before = git("rev-parse", "HEAD").stdout.strip()
-    same = lambda: SKILL_DST.is_file() and SKILL_DST.read_bytes() == SKILL_SRC.read_bytes()
-    edited = SKILL_DST.is_file() and not same()
+    installed_by_us = skill_text()
     pull = git("pull", "--ff-only", "--quiet", timeout=60)
     if pull.returncode:
         err = pull.stderr.strip().splitlines() or ["git pull 실패"]
@@ -490,14 +513,7 @@ def update():
         raise RuntimeError("새 버전을 받지 못함: " + next((l for l in err if l.startswith(("error:", "fatal:"))), err[-1]))
     _fetched_at = 0.0
     changed = git("diff", "--name-only", before, "HEAD").stdout.splitlines()
-    done = []
-    if not same():
-        if edited:
-            # 설치된 스킬을 직접 고쳐 쓰던 경우 덮어쓰기 전에 남겨 둔다
-            SKILL_DST.with_suffix(".md.bak").write_bytes(SKILL_DST.read_bytes())
-        SKILL_DST.parent.mkdir(parents=True, exist_ok=True)
-        SKILL_DST.write_bytes(SKILL_SRC.read_bytes())
-        done.append("스킬을 새로 설치함. 새 /rp 세션부터 적용된다" + (" (고쳐 쓰던 스킬은 SKILL.md.bak 으로 남김)" if edited else ""))
+    done = [msg for msg in [install(installed_by_us)] if msg]
     if any(f.startswith("web/") for f in changed) or not (DIST / "index.html").is_file():
         build = subprocess.run("npm install && npm run build", shell=True, cwd=WEB, capture_output=True, text=True)
         if build.returncode:
@@ -706,6 +722,8 @@ def main(argv):
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes((src / name).read_bytes())
         print(f"예제 '{args[0]}' 를 가져옴. /rp 로 이어서 하면 된다")
+    elif cmd == "install":
+        print(install() or "스킬이 이미 최신")
     elif cmd == "update":
         try:
             done, restart = update()
