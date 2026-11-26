@@ -2,3 +2,6 @@
 *.tmp
 .DS_Store
 __pycache__/
+.run/
+web/node_modules/
+web/dist/

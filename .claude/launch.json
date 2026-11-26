@@ -4,7 +4,7 @@
     {
       "name": "rp-panel",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "4173", "--bind", "127.0.0.1", "--directory", "ui"],
+      "runtimeArgs": ["rp.py", "serve"],
       "port": 4173
     }
   ]

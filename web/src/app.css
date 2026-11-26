@@ -1,0 +1,347 @@
+/* 게임 전용 화면 요소. 색·간격·모서리는 전부 Astryx 테마 토큰에서 가져온다. */
+
+.rp-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: var(--spacing-6) var(--spacing-4) var(--spacing-12);
+}
+
+.rp-prose {
+  margin: 0;
+  font-size: 1.0625rem;
+  line-height: 1.85;
+  color: var(--color-text-primary);
+  word-break: keep-all;
+}
+.rp-list {
+  margin: 0;
+  padding-inline-start: var(--spacing-5);
+  color: var(--color-text-secondary);
+  line-height: 1.7;
+}
+.rp-list li.done {
+  text-decoration: line-through;
+  color: var(--color-text-disabled);
+}
+.rp-dim {
+  opacity: 0.5;
+}
+
+/* 장면 */
+.rp-scene {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+}
+.rp-scene.reading {
+  cursor: pointer;
+  min-height: 40vh;
+  user-select: none;
+}
+.rp-line {
+  opacity: 0.62;
+  transition: opacity var(--duration-medium, 0.25s);
+}
+.rp-line.now {
+  opacity: 1;
+  animation: rp-rise 0.28s ease-out;
+}
+.rp-scene:not(.reading) .rp-line {
+  opacity: 1;
+}
+.rp-say {
+  flex: 1;
+  padding: var(--spacing-2) var(--spacing-3) var(--spacing-3);
+  background: var(--color-background-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-inner) var(--radius-container) var(--radius-container) var(--radius-container);
+}
+.rp-sys {
+  padding: var(--spacing-3) var(--spacing-4);
+  font-family: var(--font-family-code);
+  color: var(--color-text-info);
+  border: var(--border-width) solid var(--color-border-info);
+  border-radius: var(--radius-element);
+}
+.rp-sys::before {
+  content: 'SYSTEM';
+  display: block;
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.25em;
+  opacity: 0.7;
+}
+.rp-loot {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  padding: var(--spacing-3) var(--spacing-4);
+  border: var(--border-width) solid var(--color-border-warning);
+  border-radius: var(--radius-container);
+}
+.rp-loot > :nth-child(2) {
+  flex: 1;
+}
+.rp-loot.now {
+  animation: rp-flip 0.5s ease-out;
+}
+.rp-bannerline {
+  text-align: center;
+}
+.rp-fx {
+  align-self: center;
+  font-family: var(--font-family-code);
+  font-weight: var(--font-weight-semibold);
+}
+.rp-fx.hurt {
+  color: var(--color-text-error);
+}
+.rp-fx.heal {
+  color: var(--color-text-success);
+}
+.rp-next {
+  padding-block: var(--spacing-3);
+  animation: rp-blink 1.4s infinite;
+}
+
+/* 도트 캔버스 */
+.rp-stage,
+.rp-map {
+  display: block;
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+  border: var(--border-width) solid var(--color-border-emphasized);
+  border-radius: var(--radius-container);
+  background: var(--color-background-body);
+}
+.rp-stagewrap {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--color-background-body);
+  padding-block-end: var(--spacing-2);
+}
+.rp-stagehp {
+  position: absolute;
+  inset-inline-start: var(--spacing-3);
+  inset-block-start: var(--spacing-2);
+  width: 36%;
+}
+
+/* 시계 */
+.rp-clock {
+  display: flex;
+  gap: var(--spacing-0-5);
+}
+.rp-clock i {
+  width: 18px;
+  height: 10px;
+  border: var(--border-width) solid var(--color-border-emphasized);
+  border-radius: var(--radius-inner);
+  transform: skewX(-18deg);
+  transition: background var(--duration-medium, 0.3s);
+}
+.rp-clock i.on {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+.rp-clock.bad i.on {
+  background: var(--color-error);
+  border-color: var(--color-error);
+}
+
+/* 유대 */
+.rp-bond {
+  display: flex;
+  gap: 3px;
+  margin-inline-start: auto;
+}
+.rp-bond i {
+  width: 8px;
+  height: 8px;
+  transform: rotate(45deg);
+  border: var(--border-width) solid var(--color-border-emphasized);
+}
+.rp-bond i.on {
+  background: var(--color-text-error);
+  border-color: var(--color-text-error);
+}
+
+/* 등급 */
+.rp-grade {
+  margin-inline-start: auto;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  font-family: var(--font-family-heading);
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  border: 2px solid currentColor;
+  border-radius: var(--radius-element);
+  color: var(--color-text-secondary);
+}
+.rp-grade[data-grade='D'] { color: var(--color-text-success); }
+.rp-grade[data-grade='C'] { color: var(--color-text-info); }
+.rp-grade[data-grade='B'] { color: var(--color-text-accent); }
+.rp-grade[data-grade='A'] { color: var(--color-text-warning); }
+.rp-grade[data-grade='S'] { color: var(--color-text-error); }
+
+/* 주사위 */
+.rp-die {
+  display: grid;
+  place-items: center;
+  width: 132px;
+  height: 132px;
+  font-family: var(--font-family-heading);
+  font-size: 56px;
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  clip-path: polygon(50% 0, 95% 25%, 95% 75%, 50% 100%, 5% 75%, 5% 25%);
+  transition: background 0.2s;
+}
+.rp-die.spin { animation: rp-shake 0.12s infinite; }
+.rp-die.win { background: var(--color-success); color: var(--color-on-success); }
+.rp-die.lose { background: var(--color-background-surface); color: var(--color-text-secondary); }
+.rp-die.crit { background: var(--color-warning); color: var(--color-on-warning); animation: rp-pop 0.5s; }
+.rp-die.fumble { background: var(--color-error); color: var(--color-on-error); animation: rp-pop 0.5s; }
+
+.rp-aim {
+  position: relative;
+  width: min(100%, 360px);
+  height: 18px;
+  border-radius: var(--radius-full);
+  border: var(--border-width) solid var(--color-border-emphasized);
+  background: linear-gradient(
+    90deg,
+    var(--color-error-muted) 0 18%,
+    var(--color-background-surface) 18% 34%,
+    var(--color-warning-muted) 34% 44%,
+    var(--color-success) 44% 56%,
+    var(--color-warning-muted) 56% 66%,
+    var(--color-background-surface) 66% 82%,
+    var(--color-error-muted) 82% 100%
+  );
+}
+.rp-aim-marker {
+  position: absolute;
+  top: -5px;
+  width: 4px;
+  height: 26px;
+  margin-inline-start: -2px;
+  border-radius: var(--radius-full);
+  background: var(--color-text-primary);
+}
+
+.rp-code {
+  font-family: var(--font-family-code);
+  letter-spacing: 0.3em;
+}
+
+.rp-card {
+  width: 76px;
+  height: 108px;
+  cursor: pointer;
+  border: 2px solid var(--color-border-emphasized);
+  border-radius: var(--radius-element);
+  background:
+    repeating-linear-gradient(45deg, transparent 0 6px, var(--color-accent-muted) 6px 8px),
+    var(--color-background-surface);
+  transition: transform 0.15s, border-color 0.15s;
+}
+.rp-card:hover,
+.rp-card:focus-visible {
+  transform: translateY(-6px);
+  border-color: var(--color-accent);
+  outline: none;
+}
+
+/* 전체 화면 연출 */
+.rp-banner {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  cursor: pointer;
+  background: var(--color-overlay);
+  backdrop-filter: blur(6px);
+}
+.rp-banner small {
+  letter-spacing: 0.35em;
+  color: var(--color-text-secondary);
+}
+.rp-banner hr {
+  width: min(70vw, 420px);
+  margin: var(--spacing-3) auto;
+  border: 0;
+  border-top: var(--border-width) solid var(--color-text-warning);
+  animation: rp-widen 0.6s ease-out;
+}
+.rp-banner h2 {
+  margin: 0;
+  font-family: var(--font-family-heading);
+  font-size: var(--font-size-4xl);
+  letter-spacing: 0.12em;
+  color: var(--color-text-warning);
+  animation: rp-pop 0.5s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+.rp-banner p {
+  margin: 0;
+  animation: rp-rise 0.5s 0.3s both;
+}
+
+@keyframes rp-rise { from { opacity: 0; transform: translateY(6px); } }
+@keyframes rp-blink { 50% { opacity: 0.45; } }
+@keyframes rp-flip { from { opacity: 0; transform: rotateX(90deg); } }
+@keyframes rp-pop { from { opacity: 0; transform: scale(0.6); } }
+@keyframes rp-widen { from { width: 0; } }
+@keyframes rp-shake {
+  0% { transform: rotate(-6deg) scale(1.03); }
+  50% { transform: rotate(6deg) scale(0.97); }
+  100% { transform: rotate(-6deg) scale(1.03); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rp-line.now, .rp-next, .rp-loot.now, .rp-die, .rp-banner h2, .rp-banner p, .rp-banner hr { animation: none; }
+}
+
+/* 캐릭터 외형 */
+.rp-pixel {
+  flex: none;
+  image-rendering: pixelated;
+  padding: var(--spacing-2);
+  box-sizing: content-box;
+  background: var(--color-background-body);
+  border: var(--border-width) solid var(--color-border-emphasized);
+  border-radius: var(--radius-element);
+}
+.rp-pixel.sm {
+  padding: var(--spacing-0-5);
+}
+.rp-swatch {
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  border: 2px solid var(--color-border-emphasized);
+  border-radius: var(--radius-full);
+}
+.rp-swatch[aria-pressed='true'] {
+  border-color: var(--color-text-primary);
+  outline: 2px solid var(--color-text-primary);
+  outline-offset: 2px;
+}
+
+/* 지난 장면에서 내가 고른 것 */
+.rp-said {
+  align-self: flex-end;
+  display: flex;
+  flex-direction: column;
+  max-width: 80%;
+  padding: var(--spacing-2) var(--spacing-3);
+  border: var(--border-width) solid var(--color-border-emphasized);
+  border-radius: var(--radius-container) var(--radius-container) var(--radius-inner) var(--radius-container);
+  background: var(--color-background-card);
+}
