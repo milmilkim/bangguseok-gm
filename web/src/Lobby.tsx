@@ -26,14 +26,14 @@ const GENRES = [
   {name: '던전 탐험', hook: '횃불과 식량을 아끼며 깊이 내려간다. 지도와 함정, 전리품.'},
   {name: '무협', hook: '문파와 은원, 내공과 초식. 강호에 이름을 새긴다.'},
   {name: '로판', hook: '황실과 가문, 아카데미. 회귀·빙의·계약으로 판을 뒤집는다.'},
-  {name: '현대 드라마', hook: '싸움 없이 사람과 사건으로 굴러간다. 직장, 학교, 연예계, 가족, 미스터리.'},
+  {name: '미스터리', hook: '사건과 단서, 용의자. 흩어진 조각을 맞춰 범인을 지목한다.'},
   {name: 'GM에게 맡김', hook: '아래 요청 칸에 원하는 걸 적거나, 비워 두면 GM이 고른다.'},
 ];
 const TONES = ['사이다 성장', '정통 모험', '하드코어'];
 const HEAT = ['순한맛', '보통', '매운맛'];
 const BONDS = ['없이', '은은하게', '진하게'];
 const ENDINGS = ['엔딩 있음', '엔드리스'];
-const COMBAT = ['전투 있음', '비전투'];
+const COMBAT = ['사용', '미사용'];
 const HERO = ['내 입력만', 'GM이 연기'];
 const STYLES = [
   ['blade', '검'],
@@ -240,14 +240,7 @@ export function Lobby() {
 
         <Grid columns={{minWidth: 220}} gap={3}>
           {GENRES.map(g => (
-            <SelectableCard
-              key={g.name}
-              label={g.name}
-              isSelected={genre === g.name}
-              onChange={() => {
-                setGenre(g.name);
-                if (g.name === '현대 드라마') pickCombat(COMBAT[1]);
-              }}>
+            <SelectableCard key={g.name} label={g.name} isSelected={genre === g.name} onChange={() => setGenre(g.name)}>
               <VStack gap={1}>
                 <Text type="label">{g.name}</Text>
                 <Text color="secondary">{g.hook}</Text>
@@ -261,7 +254,7 @@ export function Lobby() {
           <Pick label="판정 난이도" hint="매울수록 실패가 잦고 대가가 크다" options={HEAT} value={heat} onChange={setHeat} />
           <Pick label="관계 서사" hint="동료·라이벌과의 유대와 감정선의 비중" options={BONDS} value={bond} onChange={setBond} />
           <Pick label="결말" hint="엔드리스는 끝없이 이어지고, 원할 때 엔딩을 내 달라고 하면 돼" options={ENDINGS} value={ending} onChange={setEnding} />
-          <Pick label="전투" hint="비전투는 싸움 없이 대화·조사·관계로 풀어 가" options={COMBAT} value={combat} onChange={pickCombat} />
+          <Pick label="전투" hint="미사용이면 어느 장르든 싸움 없이 대화·조사·관계로 풀어 가" options={COMBAT} value={combat} onChange={pickCombat} />
           <Pick label="주인공" hint="GM이 연기는 내 캐릭터의 대사와 행동도 GM이 살려서 써 줘. 큰 결정은 그래도 내가 해" options={HERO} value={hero} onChange={setHero} />
         </Grid>
 
