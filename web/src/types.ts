@@ -14,6 +14,7 @@ export type Pc = {
   gauges?: Gauge[];
   conditions?: string[];
   stats: Record<string, number>;
+  traits?: {name: string; desc?: string}[];
   skills: Skill[];
   inventory: InvItem[];
   money?: Money[];

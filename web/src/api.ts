@@ -42,7 +42,7 @@ export async function fetchLog(c: string): Promise<LogEntry[]> {
   return res.ok ? res.json() : [];
 }
 
-export type UpdateInfo = {behind: number; notes: string[]};
+export type UpdateInfo = {behind: number; notes: string[]; checked: boolean};
 export const fetchUpdate = async (fresh = false): Promise<UpdateInfo> =>
   (await fetch(`/api/update${fresh ? '?fresh' : ''}`, {cache: 'no-store'})).json();
 export const applyUpdate = async (): Promise<{done?: string[]; error?: string}> =>

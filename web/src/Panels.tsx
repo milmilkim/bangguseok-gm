@@ -122,6 +122,16 @@ export function StatusTab({c, state, draft}: {c: string; state: GameState; draft
               </Card>
             ))}
           </Grid>
+          {!!pc.traits?.length && (
+            <VStack gap={1}>
+              {pc.traits.map(t => (
+                <HStack key={t.name} gap={2} vAlign="center" wrap="wrap">
+                  <Token color="blue" label={t.name} />
+                  {t.desc && <Text type="supporting" color="secondary">{t.desc}</Text>}
+                </HStack>
+              ))}
+            </VStack>
+          )}
         </VStack>
       </Card>
 
