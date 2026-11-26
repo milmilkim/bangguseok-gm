@@ -34,6 +34,7 @@ const HEAT = ['순한맛', '보통', '매운맛'];
 const BONDS = ['없이', '은은하게', '진하게'];
 const ENDINGS = ['엔딩 있음', '엔드리스'];
 const COMBAT = ['전투 있음', '비전투'];
+const HERO = ['내 입력만', 'GM이 연기'];
 const STYLES = [
   ['blade', '검'],
   ['tank', '방패'],
@@ -128,6 +129,7 @@ export function Lobby() {
   const [bond, setBond] = useState(BONDS[1]);
   const [ending, setEnding] = useState(ENDINGS[0]);
   const [combat, setCombat] = useState(COMBAT[0]);
+  const [hero, setHero] = useState(HERO[0]);
   const [gender, setGender] = useState('남성');
   const [look, setLook] = useState({style: 'blade', hair: HAIR[1], skin: SKIN[1], outfit: OUTFIT[0], cut: 'short', skirt: false});
   const [name, setName] = useState('');
@@ -158,7 +160,7 @@ export function Lobby() {
     setStats({...stats, [stat]: next});
   };
   const start = async (auto: boolean) => {
-    const form: Record<string, string> = {장르: genre, 분위기: tone, '판정 난이도': heat, '관계 서사': bond, 결말: ending, 전투: combat};
+    const form: Record<string, string> = {장르: genre, 분위기: tone, '판정 난이도': heat, '관계 서사': bond, 결말: ending, 전투: combat, 주인공: hero};
     if (auto) form.캐릭터 = 'GM이 알아서 만든다';
     else {
       form['캐릭터 이름'] = name;
@@ -260,6 +262,7 @@ export function Lobby() {
           <Pick label="관계 서사" hint="동료·라이벌과의 유대와 감정선의 비중" options={BONDS} value={bond} onChange={setBond} />
           <Pick label="결말" hint="엔드리스는 끝없이 이어지고, 원할 때 엔딩을 내 달라고 하면 돼" options={ENDINGS} value={ending} onChange={setEnding} />
           <Pick label="전투" hint="비전투는 싸움 없이 대화·조사·관계로 풀어 가" options={COMBAT} value={combat} onChange={pickCombat} />
+          <Pick label="주인공" hint="GM이 연기는 내 캐릭터의 대사와 행동도 GM이 살려서 써 줘. 큰 결정은 그래도 내가 해" options={HERO} value={hero} onChange={setHero} />
         </Grid>
 
         <Card>
