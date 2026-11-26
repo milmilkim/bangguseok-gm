@@ -1,4 +1,5 @@
 import {useEffect, useRef, useState} from 'react';
+import {Badge} from '@astryxdesign/core/Badge';
 import {Banner} from '@astryxdesign/core/Banner';
 import {Button} from '@astryxdesign/core/Button';
 import {Card} from '@astryxdesign/core/Card';
@@ -13,8 +14,9 @@ import {Text} from '@astryxdesign/core/Text';
 import {TextArea} from '@astryxdesign/core/TextArea';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {VStack} from '@astryxdesign/core/VStack';
-import {act, useCampaigns, useGmStatus} from './api';
-import {signed} from './Ask';
+import {act, applyUpdate, fetchUpdate, useCampaigns, useGmStatus} from './api';
+import type {UpdateInfo} from './api';
+import {ENDING_LABEL, signed} from './Ask';
 import {PixelAvatar} from './PixelAvatar';
 import {HAIR, OUTFIT, SKIN} from './sprites';
 
@@ -24,11 +26,15 @@ const GENRES = [
   {name: '던전 탐험', hook: '횃불과 식량을 아끼며 깊이 내려간다. 지도와 함정, 전리품.'},
   {name: '무협', hook: '문파와 은원, 내공과 초식. 강호에 이름을 새긴다.'},
   {name: '로판', hook: '황실과 가문, 아카데미. 회귀·빙의·계약으로 판을 뒤집는다.'},
+  {name: '미스터리', hook: '사건과 단서, 용의자. 흩어진 조각을 맞춰 범인을 지목한다.'},
   {name: 'GM에게 맡김', hook: '아래 요청 칸에 원하는 걸 적거나, 비워 두면 GM이 고른다.'},
 ];
 const TONES = ['사이다 성장', '정통 모험', '하드코어'];
 const HEAT = ['순한맛', '보통', '매운맛'];
 const BONDS = ['없이', '은은하게', '진하게'];
+const ENDINGS = ['엔딩 있음', '엔드리스'];
+const COMBAT = ['사용', '미사용'];
+const HERO = ['내 입력만', 'GM이 연기'];
 const STYLES = [
   ['blade', '검'],
   ['tank', '방패'],
@@ -73,6 +79,46 @@ function Pick({label, hint, options, value, onChange}: {label: string; hint?: st
   );
 }
 
+function Update() {
+  const [info, setInfo] = useState<UpdateInfo | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{done?: string[]; error?: string} | null>(null);
+  const check = (fresh: boolean) => void fetchUpdate(fresh).then(setInfo, () => {});
+  useEffect(() => check(false), []);
+  const run = async () => {
+    setBusy(true);
+    try {
+      const res = await applyUpdate();
+      setResult(res);
+      // 서버가 새 코드로 다시 뜰 시간을 준 뒤 새 패널을 불러온다
+      if (!res.error) setTimeout(() => location.reload(), 2500);
+    } catch {
+      setResult({error: '서버가 응답하지 않아. 잠시 뒤에 새로 고쳐 봐.'});
+    }
+    setBusy(false);
+  };
+
+  if (result?.error) return <Banner status="error" title="업데이트하지 못했어" description={result.error} collapsible={false} />;
+  if (result) return <Banner status="success" title="업데이트 완료" description={`${result.done?.join(' · ')}. 곧 화면을 새로 불러와.`} collapsible={false} />;
+  if (!info) return null;
+  if (!info.behind) {
+    return (
+      <HStack hAlign="end">
+        <Button size="sm" variant="ghost" label="업데이트 확인" onClick={() => check(true)} />
+      </HStack>
+    );
+  }
+  return (
+    <Banner
+      status="info"
+      title={`새 버전이 있어 (변경 ${info.behind}개)`}
+      description={info.notes.join(' / ')}
+      collapsible={false}
+      endContent={<Button variant="primary" size="sm" label={busy ? '받는 중…' : '업데이트'} isDisabled={busy} onClick={() => void run()} />}
+    />
+  );
+}
+
 export function Lobby() {
   const campaigns = useCampaigns();
   const gm = useGmStatus();
@@ -81,6 +127,9 @@ export function Lobby() {
   const [tone, setTone] = useState(TONES[0]);
   const [heat, setHeat] = useState(HEAT[1]);
   const [bond, setBond] = useState(BONDS[1]);
+  const [ending, setEnding] = useState(ENDINGS[0]);
+  const [combat, setCombat] = useState(COMBAT[0]);
+  const [hero, setHero] = useState(HERO[0]);
   const [gender, setGender] = useState('남성');
   const [look, setLook] = useState({style: 'blade', hair: HAIR[1], skin: SKIN[1], outfit: OUTFIT[0], cut: 'short', skirt: false});
   const [name, setName] = useState('');
@@ -100,6 +149,10 @@ export function Lobby() {
     }
   }, [campaigns, sent]);
 
+  const pickCombat = (value: string) => {
+    setCombat(value);
+    if (value === COMBAT[1]) setLook({...look, style: 'plain'});
+  };
   const spent = STATS.reduce((sum, s) => sum + stats[s], 0);
   const bump = (stat: string, by: number) => {
     const next = stats[stat] + by;
@@ -107,7 +160,7 @@ export function Lobby() {
     setStats({...stats, [stat]: next});
   };
   const start = async (auto: boolean) => {
-    const form: Record<string, string> = {장르: genre, 분위기: tone, '판정 난이도': heat, '관계 서사': bond};
+    const form: Record<string, string> = {장르: genre, 분위기: tone, '판정 난이도': heat, '관계 서사': bond, 결말: ending, 전투: combat, 주인공: hero};
     if (auto) form.캐릭터 = 'GM이 알아서 만든다';
     else {
       form['캐릭터 이름'] = name;
@@ -137,9 +190,11 @@ export function Lobby() {
   return (
     <VStack gap={8}>
       <VStack gap={1}>
-        <Heading level={1} type="display-3">RP</Heading>
+        <Heading level={1} type="display-3">방구석 GM</Heading>
         <Text color="secondary">이야기는 이 화면에서 읽고, 행동도 여기서 입력해. GM은 채팅 창 뒤에서 판을 굴려.</Text>
       </VStack>
+
+      <Update />
 
       {away && (
         <Banner
@@ -169,6 +224,7 @@ export function Lobby() {
                     {c.grade ? ` (${c.grade}급)` : ''}
                   </Text>
                   <Text type="supporting" color="secondary">{[c.time, c.place].filter(Boolean).join(' · ')}</Text>
+                  {c.ending && <Badge variant="success" label={`${ENDING_LABEL[c.ending.kind]} · ${c.ending.title}`} />}
                 </VStack>
               </ClickableCard>
             ))}
@@ -197,6 +253,9 @@ export function Lobby() {
           <Pick label="분위기" options={TONES} value={tone} onChange={setTone} />
           <Pick label="판정 난이도" hint="매울수록 실패가 잦고 대가가 크다" options={HEAT} value={heat} onChange={setHeat} />
           <Pick label="관계 서사" hint="동료·라이벌과의 유대와 감정선의 비중" options={BONDS} value={bond} onChange={setBond} />
+          <Pick label="결말" hint="엔드리스는 끝없이 이어지고, 원할 때 엔딩을 내 달라고 하면 돼" options={ENDINGS} value={ending} onChange={setEnding} />
+          <Pick label="전투" hint="미사용이면 어느 장르든 싸움 없이 대화·조사·관계로 풀어 가" options={COMBAT} value={combat} onChange={pickCombat} />
+          <Pick label="주인공" hint="GM이 연기는 내 캐릭터의 대사와 행동도 GM이 살려서 써 줘. 큰 결정은 그래도 내가 해" options={HERO} value={hero} onChange={setHero} />
         </Grid>
 
         <Card>

@@ -11,6 +11,7 @@
   rp.py roll <슬러그> <판정명> <능력치> <난이도>   입력 요청 없이 GM이 바로 굴려 기록. 능력치는 힘, 힘+2, +3 꼴
   rp.py dice [면수]      GM 비공개 굴림 (기본 20)
   rp.py example [슬러그] 예제 캠페인을 내 세이브로 복사 (슬러그 없이 실행하면 목록)
+  rp.py update           레포의 새 버전을 받아 스킬·패널·서버에 반영 (패널 로비의 업데이트 버튼과 같다)
 
 대본 줄 형식 (빈 줄 무시, 아래에 안 걸리면 서술 한 문단):
   @이름 대사                         이름의 공백은 _
@@ -27,6 +28,7 @@
   ?timed 10 | A | B                  제한 시간(초) 안에 고른다. 시간 초과도 결과
   ?code 라벨 | 자리수                암호·숫자 입력
   ?cards 라벨 | 3                    뒤집힌 카드 N장 중 한 장
+  ?ending 제목 | 종류 | 한 줄 요약   캠페인의 결말. 종류는 true / good / normal / bad
 """
 import json
 import os
@@ -56,12 +58,15 @@ TAKEN = RUN / "taken"
 # 패널은 state 원본이 아니라 turn/publish 때 찍어 둔 사본을 읽는다.
 # GM이 원본을 고치는 도중의 수치가 장면보다 먼저 화면에 새지 않게 하기 위해서다.
 PUB = RUN / "pub"
-PORT = 4173
+PORT = int(os.environ.get("RP_PORT", 4173))
 HOSTS = {f"localhost:{PORT}", f"127.0.0.1:{PORT}"}
 URL = f"http://localhost:{PORT}/"
 SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 MAX_ROLLS = 30
 MAX_TEXT = 2000
+SKILL_SRC = ROOT / "skill" / "SKILL.md"
+SKILL_DST = Path.home() / ".claude" / "skills" / "rp" / "SKILL.md"
+ENDINGS = ("true", "good", "normal", "bad")
 
 
 def state_path(slug):
@@ -146,6 +151,12 @@ def parse(text, stats):
             elif kind == "cards":
                 label, *count = split(rest, 1)
                 ask = {"type": "cards", "label": label, "count": int(count[0]) if count else 3}
+            elif kind == "ending":
+                title, tone, *summary = split(rest, 2)
+                if tone not in ENDINGS:
+                    raise ValueError(f"결말 종류는 {' / '.join(ENDINGS)} 중 하나: {tone!r}")
+                ask = {"type": "ending", "title": title, "kind": tone, "text": summary[0] if summary else "",
+                       "choices": ["후일담을 더 본다", "놓친 갈래를 묻는다", "2회차를 시작한다"]}
             else:
                 raise ValueError(f"모르는 입력 종류: ?{kind}")
         elif s.startswith("> "):
@@ -252,6 +263,8 @@ def write_turn(slug, text):
     seq = state.get("scene", {}).get("id", 0) + 1
     state["scene"] = {"id": seq, "lines": lines}
     state["ask"] = {"id": seq, **ask}
+    if ask["type"] == "ending":
+        state["ending"] = {"title": ask["title"], "kind": ask["kind"], "text": ask["text"], "scene": seq}
     state["rolls"] = state.get("rolls", [])[-MAX_ROLLS:]
     save_state(slug, state)
     save_state(slug, state, shown=True)
@@ -367,7 +380,7 @@ def answer(body, from_chat=False):
     if body.get("ask") != ask.get("id") or ask.get("answer"):
         return 409, {"error": "이미 지나간 입력"}
     kinds = {"action": {"action"}, "roll": {"roll"}, "choice": {"choice"}, "timed": {"choice", "timeout"},
-             "code": {"code"}, "cards": {"card"}}
+             "code": {"code"}, "cards": {"card"}, "ending": {"action"}}
     # 채팅에서는 판정이나 선택지가 떠 있어도 다른 행동을 하겠다고 말할 수 있다
     if kind not in kinds.get(ask.get("type"), set()) and not (from_chat and kind == "action"):
         return 400, {"error": f"지금 받을 수 없는 입력 (지금 요청: {ask.get('type')})"}
@@ -434,8 +447,66 @@ def campaigns():
         pc = s.get("pc", {})
         out.append({"slug": path.stem, "title": s.get("title", path.stem), "genre": s.get("genre", ""),
                     "time": s.get("time", ""), "place": s.get("place", ""), "pc": pc.get("name", ""),
-                    "grade": pc.get("grade", ""), "scene": s.get("scene", {}).get("id", 0)})
+                    "grade": pc.get("grade", ""), "scene": s.get("scene", {}).get("id", 0),
+                    "ending": s.get("ending")})
     return out
+
+
+# ---------------------------------------------------------------- 업데이트
+
+def git(*args, timeout=20):
+    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
+    return subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, text=True, timeout=timeout, env=env)
+
+
+_fetched_at = 0.0
+
+
+def update_info(fresh=False):
+    """원격에 아직 안 받은 커밋이 몇 개인지와 그 제목. 오프라인이거나 git 레포가 아니면 0."""
+    global _fetched_at
+    try:
+        if fresh or time.time() - _fetched_at > 600:
+            git("fetch", "--quiet", timeout=8)
+            _fetched_at = time.time()
+        behind = int(git("rev-list", "--count", "HEAD..@{u}").stdout.strip() or 0)
+        notes = git("log", "--format=%s", "-n", "8", "HEAD..@{u}").stdout.splitlines() if behind else []
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        behind, notes = 0, []
+    return {"behind": behind, "notes": notes}
+
+
+def update():
+    """새 버전을 받아 반영하고 (한 일 목록, 서버를 다시 띄워야 하는지) 를 돌려준다."""
+    global _fetched_at
+    before = git("rev-parse", "HEAD").stdout.strip()
+    same = lambda: SKILL_DST.is_file() and SKILL_DST.read_bytes() == SKILL_SRC.read_bytes()
+    edited = SKILL_DST.is_file() and not same()
+    pull = git("pull", "--ff-only", "--quiet", timeout=60)
+    if pull.returncode:
+        err = pull.stderr.strip().splitlines() or ["git pull 실패"]
+        if "overwritten" in pull.stderr:
+            raise RuntimeError(f"{ROOT} 에 커밋하지 않은 수정이 있어서 새 버전을 받지 못함. 아무것도 바꾸지 않았다")
+        raise RuntimeError("새 버전을 받지 못함: " + next((l for l in err if l.startswith(("error:", "fatal:"))), err[-1]))
+    _fetched_at = 0.0
+    changed = git("diff", "--name-only", before, "HEAD").stdout.splitlines()
+    done = []
+    if not same():
+        if edited:
+            # 설치된 스킬을 직접 고쳐 쓰던 경우 덮어쓰기 전에 남겨 둔다
+            SKILL_DST.with_suffix(".md.bak").write_bytes(SKILL_DST.read_bytes())
+        SKILL_DST.parent.mkdir(parents=True, exist_ok=True)
+        SKILL_DST.write_bytes(SKILL_SRC.read_bytes())
+        done.append("스킬을 새로 설치함. 새 /rp 세션부터 적용된다" + (" (고쳐 쓰던 스킬은 SKILL.md.bak 으로 남김)" if edited else ""))
+    if any(f.startswith("web/") for f in changed) or not (DIST / "index.html").is_file():
+        build = subprocess.run("npm install && npm run build", shell=True, cwd=WEB, capture_output=True, text=True)
+        if build.returncode:
+            raise RuntimeError("패널 빌드 실패: " + (build.stderr.strip().splitlines() or ["npm 오류"])[-1])
+        done.append("패널을 다시 빌드함")
+    restart = "rp.py" in changed
+    if restart:
+        done.append("서버를 다시 띄움")
+    return done or ["이미 최신 버전"], restart
 
 
 # ---------------------------------------------------------------- 서버
@@ -485,6 +556,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json(200, campaigns())
         if path == "/api/status":
             return self.send_json(200, status())
+        if path == "/api/update":
+            return self.send_json(200, update_info("fresh" in urlparse(self.path).query))
         if path == "/api/log":
             try:
                 return self.send_json(200, read_log(parse_qs(urlparse(self.path).query).get("c", [""])[0]))
@@ -496,9 +569,21 @@ class Handler(SimpleHTTPRequestHandler):
         if not self.local_only():
             return
         origin = self.headers.get("Origin", "")
-        if urlparse(self.path).path != "/api/act" or urlparse(origin).netloc not in HOSTS \
+        path = urlparse(self.path).path
+        if path not in ("/api/act", "/api/update") or urlparse(origin).netloc not in HOSTS \
                 or "application/json" not in self.headers.get("Content-Type", ""):
             return self.send_json(403, {"error": "forbidden"})
+        if path == "/api/update":
+            try:
+                done, restart = update()
+            except (RuntimeError, OSError, subprocess.TimeoutExpired) as e:
+                return self.send_json(500, {"error": str(e)})
+            self.send_json(200, {"ok": True, "done": done})
+            if restart:
+                # 새 rp.py 로 같은 자리에서 다시 시작한다. 대기 중인 GM의 입력 대기는 별도 프로세스라 영향이 없다.
+                self.wfile.flush()
+                os.execv(sys.executable, [sys.executable, str(Path(__file__).resolve()), "serve"])
+            return
         length = int(self.headers.get("Content-Length") or 0)
         if not 0 < length <= 16384:
             return self.send_json(413, {"error": "too large"})
@@ -543,6 +628,9 @@ def start():
         if SLUG.match(path.stem) and not (PUB / path.name).exists():
             publish(path.stem)
     print(f"패널: {URL}")
+    behind = update_info()["behind"]
+    if behind:
+        print(f"새 버전: 변경 {behind}개. 패널 로비의 업데이트 버튼이나 rp.py update 로 받는다")
     for c in campaigns():
         print(f"  세이브 {c['slug']}: {c['title']} ({c['genre']}) · {c['pc']} · {c['time']} {c['place']}  → {URL}?c={c['slug']}")
 
@@ -618,6 +706,15 @@ def main(argv):
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes((src / name).read_bytes())
         print(f"예제 '{args[0]}' 를 가져옴. /rp 로 이어서 하면 된다")
+    elif cmd == "update":
+        try:
+            done, restart = update()
+        except (RuntimeError, OSError, subprocess.TimeoutExpired) as e:
+            sys.exit(str(e))
+        print("\n".join(done))
+        if restart and server_up():
+            stop()
+            start()
     elif cmd == "dice":
         sides = int(args[0]) if args else 20
         print(f"🎲 d{sides} = {secrets.randbelow(sides) + 1}")
@@ -634,6 +731,8 @@ def selfcheck():
     assert ask["mod"] == 5 and ask["dc"] == 16 and ask["aim"] and ask["boosts"][0]["mod"] == 7, ask
     assert parse("가.\n> 문을 연다\n> 돌아간다", stats)[1] == {"type": "action", "choices": ["문을 연다", "돌아간다"]}
     assert parse("가.\n?timed 10 | 뛴다 | 숨는다", stats)[1]["seconds"] == 10
+    end = parse("가.\n?ending 썰물이 빠진 뒤 | good | 섬은 남았다", stats)[1]
+    assert (end["type"], end["title"], end["kind"], end["text"]) == ("ending", "썰물이 빠진 뒤", "good", "섬은 남았다"), end
     try:
         parse("가.\n?roll 쉬운 일 | 힘 | 6", stats)
         raise AssertionError("너무 쉬운 판정이 통과함")
@@ -649,7 +748,7 @@ def selfcheck():
         raise AssertionError("없는 대상이 통과함")
     except ValueError:
         pass
-    for bad in ("", "가.\n?roll 힘 | 지능 | 12", "가.\n?aim", "가.\n> 제안\n뒤에 본문", "가.\n* 거미 5"):
+    for bad in ("", "가.\n?roll 힘 | 지능 | 12", "가.\n?aim", "가.\n> 제안\n뒤에 본문", "가.\n* 거미 5", "가.\n?ending 제목 | 해피"):
         try:
             parse(bad, stats)
             raise AssertionError(f"통과하면 안 됨: {bad!r}")
