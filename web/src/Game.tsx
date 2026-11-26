@@ -65,6 +65,7 @@ export function Game({c}: {c: string}) {
               <Text type="supporting" color="secondary">{gmLabel(gm)}</Text>
             </HStack>
           )}
+          <Link href={`/?h=${c}`}>홈</Link>
           <Link href="/">로비</Link>
         </HStack>
       </HStack>

@@ -289,7 +289,7 @@ function CardsAsk({ask, send}: {ask: Extract<Ask, {type: 'cards'}>; send: Send})
 
 export const ENDING_LABEL: Record<Ending['kind'], string> = {true: '진 엔딩', good: '굿 엔딩', normal: '노멀 엔딩', bad: '배드 엔딩'};
 
-function EndingCard({ending, state}: {ending: Ending; state: GameState}) {
+export function EndingCard({ending, state}: {ending: Ending; state: GameState}) {
   const bonds = state.npcs.filter(n => n.bond).sort((a, b) => b.bond!.cur - a.bond!.cur).slice(0, 3);
   const record = [
     `장면 ${state.scene?.id ?? 0}`,

@@ -19,10 +19,10 @@ import {VStack} from '@astryxdesign/core/VStack';
 import {act, applyUpdate, fetchUpdate, useCampaigns, useGmStatus} from './api';
 import type {UpdateInfo} from './api';
 import {ENDING_LABEL, signed} from './Ask';
+import {endingTone} from './Home';
 import {PixelAvatar} from './PixelAvatar';
 import {HAIR, OUTFIT, SKIN} from './sprites';
 import {OPTIONS} from './types';
-import type {Campaign, Ending} from './types';
 
 const GENRES = [
   {name: '헌터물', hook: '게이트, 등급, 스킬. 밑바닥에서 치고 올라가는 성장물.'},
@@ -130,45 +130,6 @@ function Part({title, note, children}: {title: string; note?: string; children: 
         {children}
       </VStack>
     </Card>
-  );
-}
-
-const endingTone = (e: Ending) => (e.kind === 'bad' ? 'error' : e.kind === 'normal' ? 'neutral' : 'success');
-
-function Endings({campaigns}: {campaigns: Campaign[]}) {
-  // 2회차는 series 로 첫 캠페인에 묶여서 한 이야기의 결말로 같이 센다
-  const groups = new Map<string, {title: string; seen: Map<string, Ending>}>();
-  for (const c of campaigns) {
-    if (!c.ending) continue;
-    const key = c.series || c.slug;
-    const group = groups.get(key) ?? {title: campaigns.find(x => x.slug === key)?.title ?? c.title, seen: new Map()};
-    group.seen.set(c.ending.title, c.ending);
-    groups.set(key, group);
-  }
-  if (!groups.size) return null;
-  return (
-    <VStack gap={3}>
-      <Heading level={2}>본 엔딩</Heading>
-      {[...groups.entries()].map(([key, group]) => {
-        const seen = [...group.seen.values()];
-        const total = Math.max(...seen.map(e => e.total ?? 0));
-        return (
-          <Card key={key} variant="muted">
-            <VStack gap={2}>
-              <HStack hAlign="between" vAlign="center">
-                <Text type="label">{group.title}</Text>
-                <Text color="secondary" hasTabularNumbers>{total ? `${seen.length}/${total}` : `${seen.length}개`}</Text>
-              </HStack>
-              <HStack gap={1} wrap="wrap">
-                {seen.map(e => (
-                  <Badge key={e.title} variant={endingTone(e)} label={`${ENDING_LABEL[e.kind]} · ${e.title}`} />
-                ))}
-              </HStack>
-            </VStack>
-          </Card>
-        );
-      })}
-    </VStack>
   );
 }
 
@@ -358,22 +319,18 @@ export function Lobby() {
       )}
 
       <TabList value={shown} onChange={setTab} hasDivider>
-        {campaigns.length > 0 && <Tab value="continue" label="이어하기" />}
+        {campaigns.length > 0 && <Tab value="continue" label="내 게임" />}
         <Tab value="new" label="새 게임" />
         <Tab value="help" label="처음이라면" />
       </TabList>
 
       {shown === 'continue' && (
-        <VStack gap={6}>
           <Grid columns={{minWidth: 260}} gap={3}>
             {campaigns.map(c => (
               <ClickableCard
                 key={c.slug}
-                label={`${c.title} 이어하기`}
-                onClick={async () => {
-                  await act({kind: 'continue', c: c.slug});
-                  location.search = `?c=${c.slug}`;
-                }}>
+                label={`${c.title} 열기`}
+                onClick={() => (location.search = `?h=${c.slug}`)}>
                 <VStack gap={1}>
                   <Heading level={3}>{c.title}</Heading>
                   <Text color="secondary">
@@ -386,8 +343,6 @@ export function Lobby() {
               </ClickableCard>
             ))}
           </Grid>
-          <Endings campaigns={campaigns} />
-        </VStack>
       )}
 
       {shown === 'new' && (

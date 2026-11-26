@@ -1,7 +1,9 @@
 import {useEffect, useRef, useState} from 'react';
 import type {Answer, Campaign, GameState, LogEntry} from './types';
 
-export const slug = new URLSearchParams(location.search).get('c');
+const query = new URLSearchParams(location.search);
+export const slug = query.get('c');
+export const homeSlug = query.get('h');
 
 function usePolled<T>(url: string | null, ms: number): T | null {
   const [data, setData] = useState<T | null>(null);
