@@ -505,17 +505,18 @@ _fetched_at = 0.0
 
 
 def update_info(fresh=False):
-    """원격에 아직 안 받은 커밋이 몇 개인지와 그 제목. 오프라인이거나 git 레포가 아니면 0."""
+    """원격에 아직 안 받은 커밋이 몇 개인지와 그 제목. 오프라인이거나 git 레포가 아니면 checked 가 False."""
     global _fetched_at
     try:
         if fresh or time.time() - _fetched_at > 600:
-            git("fetch", "--quiet", timeout=8)
+            if git("fetch", "--quiet", timeout=8).returncode:
+                raise OSError("fetch 실패")
             _fetched_at = time.time()
         behind = int(git("rev-list", "--count", "HEAD..@{u}").stdout.strip() or 0)
         notes = git("log", "--format=%s", "-n", "8", "HEAD..@{u}").stdout.splitlines() if behind else []
     except (OSError, ValueError, subprocess.TimeoutExpired):
-        behind, notes = 0, []
-    return {"behind": behind, "notes": notes}
+        return {"behind": 0, "notes": [], "checked": False}
+    return {"behind": behind, "notes": notes, "checked": True}
 
 
 def update():

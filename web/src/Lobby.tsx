@@ -122,7 +122,16 @@ function Update() {
   const [info, setInfo] = useState<UpdateInfo | null>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{done?: string[]; error?: string} | null>(null);
-  const check = (fresh: boolean) => void fetchUpdate(fresh).then(setInfo, () => {});
+  // 직접 눌러서 확인했을 때만 결과를 글로 알려 준다
+  const [asked, setAsked] = useState(false);
+  const check = (fresh: boolean) =>
+    void fetchUpdate(fresh).then(
+      found => {
+        setInfo(found);
+        setAsked(fresh);
+      },
+      () => {},
+    );
   useEffect(() => check(false), []);
   const run = async () => {
     setBusy(true);
@@ -142,7 +151,12 @@ function Update() {
   if (!info) return null;
   if (!info.behind) {
     return (
-      <HStack hAlign="end">
+      <HStack hAlign="end" vAlign="center" gap={2}>
+        {asked && (
+          <Text type="supporting" color="secondary">
+            {info.checked ? '지금이 최신 버전이야' : '확인하지 못했어. 인터넷 연결을 확인해 줘'}
+          </Text>
+        )}
         <Button size="sm" variant="ghost" label="업데이트 확인" onClick={() => check(true)} />
       </HStack>
     );
