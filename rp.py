@@ -31,6 +31,7 @@
   ?cards 라벨 | 3                    뒤집힌 카드 N장 중 한 장
   ?ending 제목 | 종류 | 한 줄 요약 | 갈래 수   캠페인의 결말. 종류는 true / good / normal / bad. 갈래 수는 생략 가능
 """
+import hashlib
 import json
 import os
 import re
@@ -481,16 +482,20 @@ def skill_text():
     return SKILL_SRC.read_text(encoding="utf-8").replace("~/personal/rp", where)
 
 
-def install(expected=None):
+def install():
     """스킬을 설치하고 한 일을 한 줄로 돌려준다(이미 같으면 None).
-    설치돼 있던 것이 expected(직전 버전이 깔았을 내용)와 다르면 유저가 고쳐 쓴 것이므로 .bak 으로 남긴다."""
+    설치돼 있던 것이 지난번에 우리가 깐 내용(.run/skill.sha)과 다르면 유저가 고쳐 쓴 것이므로 .bak 으로 남긴다."""
+    stamp = RUN / "skill.sha"
+    sha = lambda text: hashlib.sha256(text.encode()).hexdigest()
     new = skill_text()
     old = SKILL_DST.read_text(encoding="utf-8") if SKILL_DST.is_file() else None
-    if old == new:
-        return None
-    kept = old is not None and old != expected
+    kept = old not in (None, new) and not (stamp.is_file() and stamp.read_text() == sha(old))
     if kept:
         SKILL_DST.with_suffix(".md.bak").write_text(old, encoding="utf-8")
+    RUN.mkdir(exist_ok=True)
+    stamp.write_text(sha(new))
+    if old == new:
+        return None
     SKILL_DST.parent.mkdir(parents=True, exist_ok=True)
     SKILL_DST.write_text(new, encoding="utf-8")
     return "스킬을 새로 설치함. 새 /rp 세션부터 적용된다" + (" (고쳐 쓰던 스킬은 SKILL.md.bak 으로 남김)" if kept else "")
@@ -523,7 +528,6 @@ def update():
     """새 버전을 받아 반영하고 (한 일 목록, 서버를 다시 띄워야 하는지) 를 돌려준다."""
     global _fetched_at
     before = git("rev-parse", "HEAD").stdout.strip()
-    installed_by_us = skill_text()
     pull = git("pull", "--ff-only", "--quiet", timeout=60)
     if pull.returncode:
         err = pull.stderr.strip().splitlines() or ["git pull 실패"]
@@ -532,7 +536,7 @@ def update():
         raise RuntimeError("새 버전을 받지 못함: " + next((l for l in err if l.startswith(("error:", "fatal:"))), err[-1]))
     _fetched_at = 0.0
     changed = git("diff", "--name-only", before, "HEAD").stdout.splitlines()
-    done = [msg for msg in [install(installed_by_us)] if msg]
+    done = [msg for msg in [install()] if msg]
     if any(f.startswith("web/") for f in changed) or not (DIST / "index.html").is_file():
         build = subprocess.run("npm install && npm run build", shell=True, cwd=WEB, capture_output=True, text=True)
         if build.returncode:
